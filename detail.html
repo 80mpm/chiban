@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>案件詳細 — 案件管理システム</title>
+<link rel="stylesheet" href="libs/leaflet/dist/leaflet.css">
+<link rel="stylesheet" href="topbar.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+    font-size: 14px;
+    color: #1a2c3a;
+    background: #f4f8fb;
+    overflow: hidden;
+  }
+
+  .app {
+    display: flex; flex-direction: column;
+    height: 100vh;
+  }
+  /* .topbar 関連の定義は topbar.css に集約済み */
+
+  /* ---------- 上部の案件サマリー横帯 ---------- */
+  .summary-bar {
+    flex: none;
+    display: flex; flex-direction: column;
+    background: #fff;
+    border-bottom: 1px solid #d4dde6;
+  }
+  .summary-bar .sum-row { display: flex; align-items: stretch; }
+  /* 下段は上段との境界に罫線 */
+  .summary-bar .sum-row-bottom { border-top: 1px solid #eef2f7; }
+  .summary-bar .sum-item {
+    display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 8px 16px;
+    border-right: 1px solid #eef2f7;
+    min-width: 0;
+    flex: 1 1 0;
+  }
+  /* 住所はやや広め、下段のアクセス・概要は左右半々 */
+  .summary-bar .sum-item.sum-address { flex: 2 1 0; }
+  .summary-bar .sum-row-bottom .sum-item { flex: 1 1 0; }
+  .summary-bar .sum-item .label {
+    font-size: 10px; color: #94a3b8; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .summary-bar .sum-item .value {
+    font-size: 13px; color: #1e293b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+  .summary-bar .sum-item .value.muted { color: #94a3b8; }
+  .summary-bar .sum-edit {
+    align-self: center; flex: none;
+    margin: 0 16px;
+    padding: 7px 14px;
+    background: #065a82; color: #fff;
+    border-radius: 6px; text-decoration: none;
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+  }
+  .summary-bar .sum-edit:hover { background: #0a78ad; }
+
+  /* ---------- 公図風ビュー(左) / 地図(右) の左右半々ペイン ---------- */
+  .detail-body {
+    flex: 1; min-height: 0;
+    display: flex;
+  }
+  .pane {
+    flex: 1 1 50%; min-width: 0;
+    position: relative;
+    display: flex; flex-direction: column;
+  }
+  .pane-kouzu { border-right: 2px solid #d4dde6; background: #f1f5f9; }
+  .pane-map { background: #eef2f7; }
+
+  #map { position: absolute; inset: 0; }
+
+  /* ---------- 公図風ビュー（土地ポリゴンから自動生成） ---------- */
+  .kouzu-stage {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .kouzu-stage svg {
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+    max-width: 100%; max-height: 100%;
+  }
+  .kouzu-stage svg polygon.fude {
+    cursor: pointer;
+    transition: fill-opacity .12s;
+    vector-effect: non-scaling-stroke;
+    stroke-width: 1.2;
+  }
+  .kouzu-stage svg polygon.fude:hover { fill-opacity: 0.65 !important; }
+  .kouzu-stage svg polygon.fude.selected {
+    stroke-width: 3.5;
+    fill-opacity: 0.65 !important;
+  }
+  /* 筆の中心に表示する地番・地権者・坪数ラベル（白縁取りで線と重ねても読めるように） */
+  .kouzu-stage svg .fude-label {
+    font-weight: 700;
+    font-family: -apple-system, "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+    fill: #1e293b;
+    paint-order: stroke fill;
+    stroke: #fff;
+    stroke-linejoin: round;
+    pointer-events: none;
+    user-select: none;
+  }
+  .kouzu-stage svg .north-mark {
+    fill: #94a3b8;
+    font-weight: 600;
+    pointer-events: none;
+    user-select: none;
+  }
+  .kouzu-empty {
+    padding: 30px 20px;
+    color: #94a3b8; font-size: 13px;
+    text-align: center;
+  }
+
+  /* ---------- 地番・表札ラベル ---------- */
+  .map-label {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    pointer-events: none;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .label-chiban {
+    color: #065a82; font-weight: 600; font-size: 9px;
+    text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 2px #fff, 0 0 2px #fff;
+  }
+  .label-juukyo {
+    color: #334155; font-size: 8px;
+    text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 2px #fff;
+  }
+
+  /* 地図上の各辺中点に表示する辺長ラベル */
+  .edge-length-label {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #065a82;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1e293b;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+    transform: translate(-50%, -50%);
+    display: inline-block;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  /* 前面道路の幅員ラベル（両端矢印の中点に置く赤系の小ピル） */
+  .road-width-label {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid #b91c1c;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #b91c1c;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,.18);
+    transform: translate(-50%, -50%);
+    display: inline-block;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  /* ---------- 選択中土地の詳細（右ペインの地図に重ねて全面表示） ---------- */
+  .land-detail-card {
+    position: absolute; inset: 0;
+    z-index: 600;
+    background: #fff;
+    box-shadow: -2px 0 10px rgba(0,0,0,.10);
+    padding: 16px 18px;
+    overflow-y: auto;
+    font-size: 12px; color: #1e293b;
+  }
+  .land-detail-card .land-detail-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-bottom: 12px;
+  }
+  .land-detail-card h4 {
+    font-size: 15px; font-weight: 700; color: #21295c;
+    flex: 1;
+  }
+  .land-detail-card .land-detail-close {
+    background: transparent; border: 1px solid #cbd5e1; cursor: pointer;
+    font-size: 12px; color: #475569; line-height: 1;
+    padding: 5px 10px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 4px;
+    white-space: nowrap;
+  }
+  .land-detail-card .land-detail-close:hover {
+    background: #f1f5f9; border-color: #94a3b8;
+  }
+  .land-detail-card .land-meta {
+    display: grid; grid-template-columns: 80px 1fr;
+    gap: 6px 10px;
+    margin-bottom: 12px;
+  }
+  .land-detail-card .land-meta .label {
+    color: #64748b; font-size: 11px;
+  }
+  .land-detail-card .land-meta .value {
+    color: #1e293b; font-size: 12px;
+  }
+  .land-detail-card .status-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 8px;
+    color: #fff; font-size: 11px; font-weight: 500;
+  }
+  .land-detail-card h5 {
+    font-size: 11px; color: #64748b; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .04em;
+    margin: 12px 0 6px;
+  }
+  .land-detail-card .visit {
+    background: #fef9e7; border: 1px solid #fde68a;
+    padding: 8px 10px; border-radius: 6px;
+    margin-bottom: 6px;
+  }
+  .land-detail-card .visit .cuser {
+    font-weight: 600; color: #b45309; font-size: 11px;
+  }
+  .land-detail-card .visit .ctext {
+    color: #1e293b; margin-top: 4px; line-height: 1.5; font-size: 12px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .land-detail-card .visit .cdate {
+    color: #94a3b8; font-size: 10px; margin-top: 4px;
+  }
+  /* 訪問1件あたりの「直TEL / 面談 / 次回 / 進捗 / 主権者」メタ行 */
+  .land-detail-card .visit .cmeta {
+    display: flex; flex-wrap: wrap; gap: 4px 8px;
+    margin-top: 6px; font-size: 11px; color: #475569;
+  }
+  .land-detail-card .visit .cmeta .item {
+    background: #fff; border: 1px solid #fde68a;
+    padding: 1px 6px; border-radius: 4px;
+  }
+  .land-detail-card .visit .cmeta .item .k {
+    color: #92400e; margin-right: 4px;
+  }
+  .land-detail-card .no-visits {
+    color: #94a3b8; font-size: 12px; padding: 8px;
+    text-align: center;
+  }
+  /* ---------- 訪問追加フォーム（land-detail-card 内） ---------- */
+  .land-detail-card .visit-add {
+    margin-top: 12px; padding-top: 10px;
+    border-top: 1px solid #e2e8f0;
+  }
+  .land-detail-card .visit-add h5 { margin-top: 0; }
+  .land-detail-card .visit-add .field {
+    margin-bottom: 8px;
+  }
+  .land-detail-card .visit-add .field-2col {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px;
+    margin-bottom: 8px;
+  }
+  .land-detail-card .visit-add label {
+    display: block; font-size: 10px; color: #64748b;
+    font-weight: 600; margin-bottom: 3px;
+  }
+  .land-detail-card .visit-add input,
+  .land-detail-card .visit-add textarea,
+  .land-detail-card .visit-add select {
+    width: 100%; padding: 5px 8px; font-size: 12px;
+    border: 1px solid #cbd5e1; border-radius: 5px;
+    background: #fff; font-family: inherit;
+    color: #1e293b;
+  }
+  .land-detail-card .visit-add textarea { resize: vertical; min-height: 56px; }
+  .land-detail-card .visit-add input:focus,
+  .land-detail-card .visit-add textarea:focus,
+  .land-detail-card .visit-add select:focus {
+    outline: none; border-color: #065a82; box-shadow: 0 0 0 2px rgba(6,90,130,.15);
+  }
+  .land-detail-card .visit-add button.submit {
+    margin-top: 4px;
+    padding: 6px 12px;
+    background: #065a82; color: #fff;
+    border: 0; border-radius: 5px;
+    cursor: pointer; font-size: 12px; font-weight: 500;
+    font-family: inherit;
+  }
+  .land-detail-card .visit-add button.submit:hover { background: #0a78ad; }
+
+  .error-card {
+    margin: 32px; padding: 24px;
+    background: #fff; border: 1px solid #fca5a5; border-radius: 8px;
+    color: #991b1b;
+    font-size: 14px; line-height: 1.6;
+  }
+  .error-card a { color: #991b1b; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <h1 id="title"><a href="index.html" class="sys-name">案件管理システム</a> — 案件詳細 <span class="badge">DEMO</span></h1>
+    <button class="topbar-reset" id="btn-reset">サンプルデータに戻す</button>
+    <a class="mobile-link" href="report.html" target="_blank" rel="noopener">業務報告シート ↗</a>
+  </div>
+
+  <!-- 上部: 案件サマリー横帯 -->
+  <div class="summary-bar" id="info-card" style="display:none">
+    <!-- 上段: 住所 + 数値項目 + 右上に案件編集ボタン -->
+    <div class="sum-row sum-row-top">
+      <div class="sum-item sum-address"><span class="label">住所</span><span class="value" id="info-address">—</span></div>
+      <div class="sum-item"><span class="label">総坪数</span><span class="value" id="info-tsubo">—</span></div>
+      <div class="sum-item"><span class="label">容積率</span><span class="value" id="info-far">—</span></div>
+      <div class="sum-item"><span class="label">想定容積率</span><span class="value target" id="info-target-far">—</span></div>
+      <a id="edit-link" class="sum-edit" href="index.html">案件編集</a>
+    </div>
+    <!-- 下段: アクセス / 概要 を左右半々でフル幅表示 -->
+    <div class="sum-row sum-row-bottom">
+      <div class="sum-item sum-access"><span class="label">アクセス</span><span class="value" id="info-access">—</span></div>
+      <div class="sum-item sum-desc"><span class="label">概要</span><span class="value" id="info-description">—</span></div>
+    </div>
+  </div>
+
+  <!-- 下部: 公図風ビュー(左) / 地図(右) の左右半々 -->
+  <div class="detail-body" id="map-host">
+    <!-- 左: 土地ポリゴンから自動生成する公図風ビュー -->
+    <div class="pane pane-kouzu">
+      <div class="kouzu-stage" id="kouzu-stage"></div>
+    </div>
+
+    <!-- 右: 地図（筆クリックで詳細を全面表示） -->
+    <div class="pane pane-map">
+      <div id="map"></div>
+
+      <div class="land-detail-card" id="land-detail-card" style="display:none">
+        <div class="land-detail-header">
+          <h4 id="land-detail-title">—</h4>
+          <button class="land-detail-close" id="land-detail-close" type="button">✕ 地図に戻る</button>
+        </div>
+        <div class="land-meta" id="land-detail-meta"></div>
+        <h5 id="land-visits-heading">訪問記録</h5>
+        <div id="land-visits"></div>
+        <div class="visit-add" id="land-visit-add"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="libs/leaflet/dist/leaflet.js"></script>
+<script src="embedded_data.js"></script>
+<!-- kouzu_xml_data.js は data.js のサンプル生成（実筆ポリゴン）が参照するため先に読む -->
+<script src="kouzu_xml_data.js"></script>
+<script src="data.js"></script>
+<script src="detail.js"></script>
+</body>
+</html>

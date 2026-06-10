@@ -1,0 +1,6 @@
+HANDOFF.md
+.env
+# 登記所備付地図データ原本（14MB）— 変換結果の kouzu_xml_data.js のみコミットする
+kouzu/
+__pycache__/
+.vercel/

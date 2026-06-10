@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1400">
+<title>業務報告シート — 案件管理システム</title>
+<link rel="stylesheet" href="topbar.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+    font-size: 13px;
+    color: #1a2c3a;
+    background: #f4f8fb;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 56px 1fr;
+    min-height: 100vh;
+  }
+  /* .topbar 関連の定義は topbar.css に集約済み */
+
+  .main { padding: 18px 20px; overflow-x: auto; }
+
+  .filters {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 14px;
+    font-size: 12px; color: #475569;
+  }
+  .filters select {
+    padding: 6px 10px; font-size: 13px;
+    border: 1px solid #cbd5e1; border-radius: 6px;
+    background: #fff; font-family: inherit;
+  }
+  .filters select:focus {
+    outline: none; border-color: #065a82; box-shadow: 0 0 0 2px rgba(6,90,130,.15);
+  }
+  .filters .count { color: #94a3b8; }
+
+  /* ----- 業務報告シート 表 ----- */
+  .report-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    table-layout: fixed;
+  }
+  .report-table thead th {
+    background: #f1f5f9; color: #475569;
+    padding: 8px 8px;
+    font-size: 11px; font-weight: 600;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
+    text-align: left;
+    white-space: nowrap;
+    line-height: 1.3;
+    vertical-align: middle;
+  }
+  .report-table thead th.th-stacked {
+    text-align: center;
+    line-height: 1.15;
+    font-size: 11px;
+  }
+  .report-table thead th:last-child { border-right: 0; }
+  .report-table tbody td {
+    padding: 8px 8px;
+    border-bottom: 1px solid #f1f5f9;
+    border-right: 1px solid #f1f5f9;
+    font-size: 12px;
+    color: #1e293b;
+    vertical-align: top;
+    word-break: break-word;
+    line-height: 1.5;
+  }
+  .report-table tbody td:last-child { border-right: 0; }
+  .report-table tbody tr:last-child td { border-bottom: 0; }
+  .report-table tbody tr:hover { background: #f8fafc; }
+
+  /* 列幅指定（業務報告シートに近い比率） */
+  .report-table col.col-addr      { width: 110px; }
+  .report-table col.col-name      { width: 140px; }
+  .report-table col.col-chiban    { width: 70px; }
+  .report-table col.col-owner     { width: 130px; }
+  .report-table col.col-date      { width: 88px; }
+  .report-table col.col-time      { width: 56px; }
+  .report-table col.col-direct-tel{ width: 44px; }
+  .report-table col.col-user      { width: 80px; }
+  .report-table col.col-format    { width: 76px; }
+  .report-table col.col-owner-type{ width: 70px; }
+  .report-table col.col-next-date { width: 88px; }
+  .report-table col.col-next-time { width: 60px; }
+  .report-table col.col-next-fmt  { width: 76px; }
+  .report-table col.col-comment   { width: auto; }
+  .report-table col.col-progress  { width: 90px; }
+  .report-table col.col-url       { width: 100px; }
+
+  .muted { color: #94a3b8; }
+  .nowrap { white-space: nowrap; }
+  .mono { font-variant-numeric: tabular-nums; }
+
+  /* 進捗ランクのピル */
+  .rank-pill {
+    display: inline-block;
+    min-width: 22px; padding: 1px 7px;
+    border-radius: 8px;
+    color: #fff; font-size: 11px; font-weight: 700;
+    text-align: center;
+  }
+  .rank-A { background: #10b981; }
+  .rank-B { background: #f59e0b; }
+  .rank-C { background: #f97316; }
+  .rank-D { background: #ef4444; }
+  .rank-other { background: #94a3b8; }
+
+  .empty-row {
+    text-align: center; color: #94a3b8;
+    padding: 40px 16px !important;
+  }
+
+  a.url-link {
+    color: #065a82; text-decoration: none;
+    word-break: break-all; font-size: 11px;
+  }
+  a.url-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <h1><a href="index.html" class="sys-name">案件管理システム</a> — 業務報告シート <span class="badge">DEMO</span></h1>
+    <button class="topbar-reset" id="btn-reset">サンプルデータに戻す</button>
+  </div>
+
+  <main class="main">
+    <div class="filters">
+      <label>案件 <select id="filter-project"><option value="">全て</option></select></label>
+      <label>担当 <select id="filter-user"><option value="">全て</option></select></label>
+      <span class="count" id="row-count"></span>
+    </div>
+
+    <table class="report-table">
+      <colgroup>
+        <col class="col-addr">
+        <col class="col-name">
+        <col class="col-owner">
+        <col class="col-date">
+        <col class="col-time">
+        <col class="col-direct-tel">
+        <col class="col-user">
+        <col class="col-format">
+        <col class="col-owner-type">
+        <col class="col-next-date">
+        <col class="col-next-time">
+        <col class="col-comment">
+        <col class="col-progress">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>所在地</th>
+          <th>案件名</th>
+          <th>地権者名</th>
+          <th>日付</th>
+          <th>時間</th>
+          <th>直TEL</th>
+          <th>担当</th>
+          <th>面談区分</th>
+          <th>主権者区分</th>
+          <th class="th-stacked">次回訪問<br>予定日</th>
+          <th class="th-stacked">次回訪問<br>時間</th>
+          <th>コメント</th>
+          <th>進捗状況</th>
+        </tr>
+      </thead>
+      <tbody id="report-tbody"></tbody>
+    </table>
+  </main>
+</div>
+
+<!-- kouzu_xml_data.js は data.js のサンプル生成（実筆ポリゴン）が参照するため先に読む -->
+<script src="kouzu_xml_data.js"></script>
+<script src="data.js"></script>
+<script src="report.js"></script>
+</body>
+</html>
