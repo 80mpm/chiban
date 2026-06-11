@@ -9,11 +9,16 @@
 const STATUS_DEFS = window.DataStore.STATUS_DEFS;
 const STATUS_KEYS = ['target', 'acquired'];
 
-// 全画面共有の状態。projects 配列は localStorage に永続化される。
+// 全画面共有の状態。projects 配列は PostgreSQL（/api/projects）から取得する。
+// 各画面の起動コードが最初に await initAppState() を呼んでから描画する。
 // 画面ルート（一覧 / 編集）は別ファイル化したため、ここでは保持しない。
 const state = {
-  projects: window.DataStore.load(),
+  projects: [],
 };
+
+async function initAppState() {
+  state.projects = await window.DataStore.load();
+}
 
 // ---------- ヘルパー ----------
 const $ = (id) => document.getElementById(id);
@@ -31,10 +36,6 @@ const fmtDateOnly = (d) => {
   if (isNaN(dt)) return '—';
   return `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;
 };
-
-function persist() {
-  window.DataStore.save(state.projects);
-}
 
 function toast(msg) {
   const el = $('toast');
@@ -75,10 +76,16 @@ function renderStatusBar(proj, { compact = false } = {}) {
 
 // ---------- 「サンプルデータに戻す」 ----------
 // 両画面のトップバーに同じ id="btn-reset" のボタンがある。
-// localStorage をクリアしてサンプルを再生成 → 現在の URL のままリロードする。
-$('btn-reset').addEventListener('click', () => {
-  if (!confirm('localStorage を削除し、サンプルデータに戻します。よろしいですか？')) return;
-  window.DataStore.reset();
+// データベースの案件・土地・訪問記録を破棄してサンプルを再投入 → 現在の URL のままリロードする。
+$('btn-reset').addEventListener('click', async () => {
+  if (!confirm('データベースの内容を破棄し、サンプルデータに戻します。よろしいですか？')) return;
+  try {
+    await window.DataStore.reset();
+  } catch (e) {
+    console.error(e);
+    toast(`リセットに失敗しました: ${e.message}`);
+    return;
+  }
   toast('サンプルデータに戻しました');
   setTimeout(() => window.location.reload(), 500);
 });
@@ -125,6 +132,7 @@ const PENCIL_SVG = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" 
 //
 // formatDisplay(value): 表示モードでの整形（例：坪数に「坪」を付けるなど）。省略時は素の値。
 // onConfirm(newValue) が `false` を返した場合はバリデーション失敗として編集モードを継続する。
+// onConfirm は async でもよい（API 保存の完了を待ってから表示モードに戻す）。
 function setupInlineTextField({ wrapperId, type, placeholder, getValue, onConfirm, formatDisplay }) {
   const wrapper = document.getElementById(wrapperId);
   if (!wrapper) return;
@@ -164,9 +172,11 @@ function setupInlineTextField({ wrapperId, type, placeholder, getValue, onConfir
     ctrl.focus();
     if (ctrl.select) try { ctrl.select(); } catch (_) {}
 
-    function tryConfirm() {
-      const ok = onConfirm(ctrl.value);
+    async function tryConfirm() {
+      ctrl.disabled = true;
+      const ok = await onConfirm(ctrl.value);
       if (ok === false) {
+        ctrl.disabled = false;
         ctrl.classList.add('invalid');
         ctrl.focus();
         return;
@@ -219,9 +229,10 @@ function setupInlineSelectField({ wrapperId, options, getValue, onConfirm }) {
     const ctrl = wrapper.querySelector('select');
     ctrl.focus();
 
-    function tryConfirm() {
-      const ok = onConfirm(ctrl.value);
-      if (ok === false) { ctrl.focus(); return; }
+    async function tryConfirm() {
+      ctrl.disabled = true;
+      const ok = await onConfirm(ctrl.value);
+      if (ok === false) { ctrl.disabled = false; ctrl.focus(); return; }
       renderRead();
     }
 

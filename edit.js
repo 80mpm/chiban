@@ -152,14 +152,21 @@ function bindProjectDetail(proj) {
   // 部分更新で保存。鉛筆編集の確定・ポリゴン変更すべてここを通る。
   // renderEdit() を呼ぶと Leaflet マップが再ロードされてしまうため、
   // タイトル・更新日・パンくずだけを軽量に書き換える（一覧側は次回遷移時に反映）。
-  function saveProjectFields(fields) {
+  async function saveProjectFields(fields) {
     setSaveStatus('保存中…', 'is-saving');
-    window.DataStore.updateProject(state.projects, proj.id, fields);
-    persist();
+    try {
+      await window.DataStore.updateProject(state.projects, proj.id, fields);
+    } catch (e) {
+      console.error(e);
+      setSaveStatus('保存に失敗しました', 'is-empty');
+      showFormError(`保存に失敗しました: ${e.message}`);
+      return false;
+    }
     $('proj-title').textContent = proj.name;
     $('crumb-name').textContent = proj.name;
     $('proj-updated').textContent = fmtDate(proj.updatedAt || proj.createdAt);
     setSaveStatus(`保存しました · ${hhmm(new Date())}`, 'is-saved');
+    return true;
   }
 
   setupInlineTextField({
@@ -167,15 +174,14 @@ function bindProjectDetail(proj) {
     type: 'input',
     placeholder: '例：川口駅東口案件',
     getValue: () => proj.name,
-    onConfirm: (next) => {
+    onConfirm: async (next) => {
       const trimmed = next.trim();
       if (!trimmed) {
         showFormError('案件名は必須です');
         return false;
       }
       hideFormError();
-      saveProjectFields({ name: trimmed });
-      return true;
+      return saveProjectFields({ name: trimmed });
     },
   });
   setupInlineTextField({
@@ -183,30 +189,21 @@ function bindProjectDetail(proj) {
     type: 'textarea',
     placeholder: '案件の概要・狙いなど',
     getValue: () => proj.description || '',
-    onConfirm: (next) => {
-      saveProjectFields({ description: next.trim() });
-      return true;
-    },
+    onConfirm: (next) => saveProjectFields({ description: next.trim() }),
   });
   setupInlineTextField({
     wrapperId: 'field-address',
     type: 'input',
     placeholder: '例：東京都台東区西浅草2-4-8',
     getValue: () => proj.address || '',
-    onConfirm: (next) => {
-      saveProjectFields({ address: next.trim() });
-      return true;
-    },
+    onConfirm: (next) => saveProjectFields({ address: next.trim() }),
   });
   setupInlineTextField({
     wrapperId: 'field-access',
     type: 'textarea',
     placeholder: '例：東京メトロ銀座線「田原町」駅 徒歩5分',
     getValue: () => proj.access || '',
-    onConfirm: (next) => {
-      saveProjectFields({ access: next.trim() });
-      return true;
-    },
+    onConfirm: (next) => saveProjectFields({ access: next.trim() }),
   });
   setupInlineTextField({
     wrapperId: 'field-current-far',
@@ -214,14 +211,13 @@ function bindProjectDetail(proj) {
     placeholder: '例：500',
     getValue: () => proj.currentFar,
     formatDisplay: (v) => `${v}%`,
-    onConfirm: (next) => {
+    onConfirm: async (next) => {
       const trimmed = next.trim();
-      if (trimmed === '') { saveProjectFields({ currentFar: null }); return true; }
+      if (trimmed === '') return saveProjectFields({ currentFar: null });
       const num = Number(trimmed);
       if (!Number.isFinite(num) || num < 0) { showFormError('容積率は 0 以上の数値で入力してください'); return false; }
       hideFormError();
-      saveProjectFields({ currentFar: num });
-      return true;
+      return saveProjectFields({ currentFar: num });
     },
   });
   setupInlineTextField({
@@ -230,14 +226,13 @@ function bindProjectDetail(proj) {
     placeholder: '例：480',
     getValue: () => proj.targetFar,
     formatDisplay: (v) => `${v}%`,
-    onConfirm: (next) => {
+    onConfirm: async (next) => {
       const trimmed = next.trim();
-      if (trimmed === '') { saveProjectFields({ targetFar: null }); return true; }
+      if (trimmed === '') return saveProjectFields({ targetFar: null });
       const num = Number(trimmed);
       if (!Number.isFinite(num) || num < 0) { showFormError('容積率は 0 以上の数値で入力してください'); return false; }
       hideFormError();
-      saveProjectFields({ targetFar: num });
-      return true;
+      return saveProjectFields({ targetFar: num });
     },
   });
 
@@ -259,9 +254,14 @@ function bindProjectDetail(proj) {
   setSaveStatus('');
 
   // ---------- 公図風ビュー + 土地パネル の保存ハブ ----------
-  function saveLandFields(landId, fields) {
-    window.DataStore.updateLand(state.projects, proj.id, landId, fields);
-    persist();
+  async function saveLandFields(landId, fields) {
+    try {
+      await window.DataStore.updateLand(state.projects, proj.id, landId, fields);
+    } catch (e) {
+      console.error(e);
+      toast(`保存に失敗しました: ${e.message}`);
+      return false;
+    }
     if ('status' in fields || 'areaTsubo' in fields || 'parcelId' in fields) {
       kouzuView?.refresh?.();
     }
@@ -269,6 +269,7 @@ function bindProjectDetail(proj) {
     // 筆の付け替えは町名・地番・領域・坪数の表示すべてに影響するためパネルを再描画する
     if ('parcelId' in fields) panel.refreshCurrent?.();
     refreshAcquireProgress();
+    return true;
   }
 
   function refreshAcquireProgress() {
@@ -420,7 +421,8 @@ function setupLandDetailPanel(panelId, proj, {
 
   // 筆行: 通常時は紐付く筆の表示 + 「筆を変更」。編集時は 町名 → 地番 のプルダウンで
   // 筆マスタから選び直す（マスタに存在する筆しか選べないため、不正な状態は作れない）。
-  function renderParcelRow() {
+  // 町名・筆の選択肢は町名単位で遅延取得するため async（取得中はプルダウンを無効化して示す）。
+  async function renderParcelRow() {
     const toolbar = host.querySelector('#lp-parcel-toolbar');
     if (!toolbar) return;
     const land = proj.lands.find(l => l.id === currentLandId);
@@ -431,42 +433,78 @@ function setupLandDetailPanel(panelId, proj, {
         <span class="save-status is-set">${escHtml(landTitle(land))}</span>
         <button type="button" class="btn btn-sm" data-parcel-act="change">筆を変更</button>
       `;
-    } else {
-      const areas = parcelAreas();
-      toolbar.innerHTML = `
-        <select id="lp-parcel-area" title="町名・丁目">
-          ${areas.map(a => `<option value="${escHtml(a.name)}">${escHtml(a.name)}</option>`).join('')}
-        </select>
-        <select id="lp-parcel-chiban" title="地番"></select>
-        <button type="button" class="field-icon-btn confirm" data-parcel-act="confirm" title="確定">✓</button>
-        <button type="button" class="field-icon-btn cancel" data-parcel-act="cancel" title="取消">✕</button>
-      `;
-      // 初期選択: 現在紐付いている筆の町名・地番
-      const areaSel = toolbar.querySelector('#lp-parcel-area');
-      if (areas.some(a => a.name === land.aza)) areaSel.value = land.aza;
-      populateParcelSelect(land.parcelId);
+      bindParcelRowEvents();
+      return;
     }
+
+    toolbar.innerHTML = `
+      <select id="lp-parcel-area" title="町名・丁目" disabled><option>読み込み中…</option></select>
+      <select id="lp-parcel-chiban" title="地番" disabled></select>
+      <button type="button" class="field-icon-btn confirm" data-parcel-act="confirm" title="確定" disabled>✓</button>
+      <button type="button" class="field-icon-btn cancel" data-parcel-act="cancel" title="取消">✕</button>
+    `;
     bindParcelRowEvents();
+
+    let towns;
+    try {
+      towns = await window.DataStore.parcelTowns();
+    } catch (e) {
+      console.error(e);
+      toast(`町名一覧の取得に失敗しました: ${e.message}`);
+      isEditingPolygon = false;
+      renderParcelRow();
+      refreshDeleteButton();
+      return;
+    }
+    const areaSel = toolbar.querySelector('#lp-parcel-area');
+    if (!areaSel || !areaSel.isConnected) return; // 取得中にパネルが再描画された
+    areaSel.innerHTML = towns
+      .map(t => `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`)
+      .join('');
+    areaSel.disabled = false;
+    // 初期選択: 現在紐付いている筆の町名・地番
+    if (towns.some(t => t.name === land.aza)) areaSel.value = land.aza;
+    populateParcelSelect(land.parcelId);
   }
 
-  // 町名プルダウンの選択に応じて地番プルダウンを作り直す。
+  // 町名プルダウンの選択に応じて地番プルダウンを作り直す（筆一覧は町名単位で遅延取得）。
   // 同じ案件にすでに紐付いている筆は除外する（1案件内での筆の重複を防ぐ）。
-  function populateParcelSelect(preferParcelId) {
+  let parcelSelectToken = 0; // 町名を連続で切り替えたとき、古い応答で上書きしないためのトークン
+  async function populateParcelSelect(preferParcelId) {
     const toolbar = host.querySelector('#lp-parcel-toolbar');
     const areaSel = toolbar?.querySelector('#lp-parcel-area');
     const parcelSel = toolbar?.querySelector('#lp-parcel-chiban');
+    const confirmBtn = toolbar?.querySelector('[data-parcel-act="confirm"]');
     if (!areaSel || !parcelSel) return;
+    const token = ++parcelSelectToken;
+    parcelSel.disabled = true;
+    parcelSel.innerHTML = '<option value="">読み込み中…</option>';
+    if (confirmBtn) confirmBtn.disabled = true;
+
+    let parcels;
+    try {
+      parcels = await window.DataStore.parcelsByTown(areaSel.value);
+    } catch (e) {
+      console.error(e);
+      if (token === parcelSelectToken && parcelSel.isConnected) {
+        parcelSel.innerHTML = '<option value="">（筆一覧の取得に失敗）</option>';
+      }
+      return;
+    }
+    if (token !== parcelSelectToken || !parcelSel.isConnected) return;
+
     const usedIds = new Set(
       proj.lands.filter(l => l.id !== currentLandId).map(l => l.parcelId)
     );
-    const area = parcelAreas().find(a => a.name === areaSel.value);
-    const parcels = (area ? area.parcels : []).filter(p => !usedIds.has(p.parcelId));
-    parcelSel.innerHTML = parcels
-      .map(p => `<option value="${escHtml(p.parcelId)}">${escHtml(p.chiban)}</option>`)
-      .join('');
-    if (preferParcelId && parcels.some(p => p.parcelId === preferParcelId)) {
+    const avail = parcels.filter(p => !usedIds.has(p.parcelId));
+    parcelSel.innerHTML = avail.length
+      ? avail.map(p => `<option value="${escHtml(p.parcelId)}">${escHtml(p.chiban)}</option>`).join('')
+      : '<option value="">（この町名の筆はすべて追加済み）</option>';
+    if (preferParcelId && avail.some(p => p.parcelId === preferParcelId)) {
       parcelSel.value = preferParcelId;
     }
+    parcelSel.disabled = false;
+    if (confirmBtn) confirmBtn.disabled = false;
   }
 
   function bindParcelRowEvents() {
@@ -499,10 +537,11 @@ function setupLandDetailPanel(panelId, proj, {
     if (btn) btn.disabled = isEditingPolygon;
   }
 
-  function saveField(landId, fields) {
+  async function saveField(landId, fields) {
     hideError();
-    onSaveFields?.(landId, fields);
+    const ok = await onSaveFields?.(landId, fields);
     refreshHeader(landId);
+    return ok !== false;
   }
 
   function bindPanelEvents(land) {
@@ -512,11 +551,7 @@ function setupLandDetailPanel(panelId, proj, {
       type: 'input',
       placeholder: '例：田中一郎、または 中嶋幸子（持分1/2）・中嶋直美（持分1/2）',
       getValue: () => window.DataStore.formatOwners(land.owners),
-      onConfirm: (next) => {
-        const owners = window.DataStore.parseOwners(next);
-        saveField(land.id, { owners });
-        return true;
-      },
+      onConfirm: (next) => saveField(land.id, { owners: window.DataStore.parseOwners(next) }),
     });
 
     setupInlineTextField({
@@ -525,13 +560,12 @@ function setupLandDetailPanel(panelId, proj, {
       placeholder: '例：45',
       getValue: () => land.areaTsubo,
       formatDisplay: (v) => `${v} 坪`,
-      onConfirm: (next) => {
+      onConfirm: async (next) => {
         const trimmed = next.trim();
-        if (trimmed === '') { saveField(land.id, { areaTsubo: 0 }); return true; }
+        if (trimmed === '') return saveField(land.id, { areaTsubo: 0 });
         const num = Number(trimmed);
         if (!Number.isFinite(num) || num < 0) { showError('坪数は 0 以上の数値で入力してください'); return false; }
-        saveField(land.id, { areaTsubo: num });
-        return true;
+        return saveField(land.id, { areaTsubo: num });
       },
     });
 
@@ -540,7 +574,7 @@ function setupLandDetailPanel(panelId, proj, {
       type: 'textarea',
       placeholder: '例：家族構成・隣地との関係・接道状況など',
       getValue: () => land.description || '',
-      onConfirm: (next) => { saveField(land.id, { description: next.trim() }); return true; },
+      onConfirm: (next) => saveField(land.id, { description: next.trim() }),
     });
 
     renderParcelRow();
@@ -578,15 +612,6 @@ function setupLandDetailPanel(panelId, proj, {
     refreshCurrent,
     isEditingPolygon: () => isEditingPolygon,
   };
-}
-
-// ---------- 筆マスタヘルパー ----------
-
-// 町名ごとの筆一覧（DataStore.parcelAreas のキャッシュ。マスタは静的なので1回でよい）
-let _parcelAreasCache = null;
-function parcelAreas() {
-  if (!_parcelAreasCache) _parcelAreasCache = window.DataStore.parcelAreas();
-  return _parcelAreasCache;
 }
 
 // ---------- 公図風ビュー（土地ポリゴンの SVG 表示・クリック選択） ----------
@@ -867,22 +892,37 @@ function setupPolygonMap(containerId, initialPolygon, { onChange } = {}) {
 }
 
 // ---------- 削除・土地新規作成 ----------
-function deleteProjectConfirm(projectId) {
+async function deleteProjectConfirm(projectId) {
   const proj = state.projects.find(p => p.id === projectId);
   if (!proj) return;
   const msg = proj.lands.length > 0
     ? `「${proj.name}」を削除します。\n含まれる ${proj.lands.length} 件の土地・訪問記録もすべて削除されます。\n本当によろしいですか？`
     : `「${proj.name}」を削除します。よろしいですか？`;
   if (!confirm(msg)) return;
-  window.DataStore.deleteProject(state.projects, projectId);
-  persist();
+  try {
+    await window.DataStore.deleteProject(state.projects, projectId);
+  } catch (e) {
+    console.error(e);
+    toast(`削除に失敗しました: ${e.message}`);
+    return;
+  }
   toast('案件を削除しました');
   window.location.href = 'index.html';
 }
 
-function openLandCreateForm(projectId) {
+async function openLandCreateForm(projectId) {
   const proj = state.projects.find(p => p.id === projectId);
   if (!proj) return;
+
+  // 町名一覧は遅延取得（初回のみ API。以後はキャッシュ）
+  let towns;
+  try {
+    towns = await window.DataStore.parcelTowns();
+  } catch (e) {
+    console.error(e);
+    toast(`町名一覧の取得に失敗しました: ${e.message}`);
+    return;
+  }
 
   const statusOptions = STATUS_KEYS.map(k =>
     `<option value="${k}" ${k === 'target' ? 'selected' : ''}>${STATUS_DEFS[k].label}</option>`
@@ -896,19 +936,18 @@ function openLandCreateForm(projectId) {
   const defaultAza = [...azaCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
 
   // 筆マスタからの選択のみ。存在しない土地は選択できず、土地は必ず領域を持つ。
-  const areas = parcelAreas();
   const body = `
     <div id="form-error" class="form-error" style="display:none"></div>
     <div class="form-grid-2">
       <div class="form-row">
         <label>町名・丁目</label>
-        <select id="f-aza">${areas.map(a =>
-          `<option value="${escHtml(a.name)}"${a.name === defaultAza ? ' selected' : ''}>${escHtml(a.name)}</option>`
+        <select id="f-aza">${towns.map(t =>
+          `<option value="${escHtml(t.name)}"${t.name === defaultAza ? ' selected' : ''}>${escHtml(t.name)}</option>`
         ).join('')}</select>
       </div>
       <div class="form-row">
         <label>地番 <span style="color:#ef4444">*</span></label>
-        <select id="f-parcel"></select>
+        <select id="f-parcel" disabled></select>
       </div>
     </div>
     <div class="form-row">
@@ -919,7 +958,7 @@ function openLandCreateForm(projectId) {
     この案件にすでに追加済みの筆は表示されません。</div>
   `;
 
-  const saveBtn = makeBtn('作成', 'btn-primary', () => {
+  const saveBtn = makeBtn('作成', 'btn-primary', async () => {
     const errEl = document.getElementById('form-error');
     errEl.style.display = 'none';
 
@@ -931,13 +970,15 @@ function openLandCreateForm(projectId) {
     }
 
     const status = document.getElementById('f-status').value;
-    const land = window.DataStore.createLand(state.projects, projectId, { parcelId, status });
-    if (!land) {
-      errEl.textContent = '筆マスタに存在しない地番です';
+    try {
+      await window.DataStore.createLand(state.projects, projectId, { parcelId, status });
+    } catch (e) {
+      // 筆マスタに存在しない地番・案件内での筆重複などはサーバが日本語メッセージで拒否する
+      console.error(e);
+      errEl.textContent = e.message;
       errEl.style.display = 'block';
       return;
     }
-    persist();
     toast('土地を追加しました（領域・坪数は筆マスタから自動設定）');
     closeModal();
     renderEdit();
@@ -949,17 +990,33 @@ function openLandCreateForm(projectId) {
     footer: [makeBtn('キャンセル', '', closeModal), saveBtn],
   });
 
-  // 町名の選択に応じて地番プルダウンを入れ替える（案件内で使用済みの筆は除外）
+  // 町名の選択に応じて地番プルダウンを入れ替える（筆一覧は町名単位で遅延取得。
+  // 案件内で使用済みの筆は除外）
   const azaEl = document.getElementById('f-aza');
   const parcelEl = document.getElementById('f-parcel');
-  function refreshParcelOptions() {
-    if (!parcelEl) return;
+  let optionsToken = 0; // 町名を連続で切り替えたとき、古い応答で上書きしないためのトークン
+  async function refreshParcelOptions() {
+    if (!parcelEl || !azaEl) return;
+    const token = ++optionsToken;
+    parcelEl.disabled = true;
+    parcelEl.innerHTML = '<option value="">読み込み中…</option>';
+    let parcels;
+    try {
+      parcels = await window.DataStore.parcelsByTown(azaEl.value);
+    } catch (e) {
+      console.error(e);
+      if (token === optionsToken && parcelEl.isConnected) {
+        parcelEl.innerHTML = '<option value="">（筆一覧の取得に失敗）</option>';
+      }
+      return;
+    }
+    if (token !== optionsToken || !parcelEl.isConnected) return;
     const usedIds = new Set(proj.lands.map(l => l.parcelId));
-    const area = areas.find(a => a.name === azaEl?.value);
-    const parcels = (area ? area.parcels : []).filter(p => !usedIds.has(p.parcelId));
-    parcelEl.innerHTML = parcels.length
-      ? parcels.map(p => `<option value="${escHtml(p.parcelId)}">${escHtml(p.chiban)}</option>`).join('')
+    const avail = parcels.filter(p => !usedIds.has(p.parcelId));
+    parcelEl.innerHTML = avail.length
+      ? avail.map(p => `<option value="${escHtml(p.parcelId)}">${escHtml(p.chiban)}</option>`).join('')
       : '<option value="">（この町名の筆はすべて追加済み）</option>';
+    parcelEl.disabled = false;
   }
   azaEl?.addEventListener('change', refreshParcelOptions);
   refreshParcelOptions();
@@ -967,7 +1024,7 @@ function openLandCreateForm(projectId) {
   setTimeout(() => { document.getElementById('f-parcel')?.focus(); }, 50);
 }
 
-function deleteLandConfirm(projectId, landId) {
+async function deleteLandConfirm(projectId, landId) {
   const proj = state.projects.find(p => p.id === projectId);
   const land = proj?.lands.find(l => l.id === landId);
   if (!land) return;
@@ -976,11 +1033,25 @@ function deleteLandConfirm(projectId, landId) {
     ? `「${land.chiban}」を削除します。\n${cnt} 件の訪問記録もすべて削除されます。\nよろしいですか？`
     : `「${land.chiban}」を削除します。よろしいですか？`;
   if (!confirm(msg)) return;
-  window.DataStore.deleteLand(state.projects, projectId, landId);
-  persist();
+  try {
+    await window.DataStore.deleteLand(state.projects, projectId, landId);
+  } catch (e) {
+    console.error(e);
+    toast(`削除に失敗しました: ${e.message}`);
+    return;
+  }
   toast('土地を削除しました');
   renderEdit();
 }
 
 // ---------- 起動 ----------
-renderEdit();
+(async function bootstrap() {
+  try {
+    await initAppState();
+  } catch (e) {
+    console.error(e);
+    $('main').innerHTML = `<div class="card">データの読み込みに失敗しました: ${escHtml(e.message)}</div>`;
+    return;
+  }
+  renderEdit();
+})();

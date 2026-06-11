@@ -57,7 +57,8 @@ function principalLabel(principal) {
   return PRINCIPAL_LABELS[principal] || PRINCIPAL_LABELS.principal;
 }
 
-const projects = window.DataStore.load();
+// 全案件ツリー。起動時に /api/projects から取得する（bootstrap 参照）。
+let projects = [];
 
 // ---------- 行データの組み立て ----------
 // 各土地について「最新訪問 1 件」のみを行に展開する。
@@ -150,12 +151,28 @@ function render() {
 }
 
 // ---------- 起動 ----------
-initFilters(buildRows());
-render();
+(async function bootstrap() {
+  try {
+    projects = await window.DataStore.load();
+  } catch (e) {
+    console.error(e);
+    $('report-tbody').innerHTML =
+      `<tr><td colspan="13" class="empty-row">データの読み込みに失敗しました: ${escHtml(e.message)}</td></tr>`;
+    return;
+  }
+  initFilters(buildRows());
+  render();
+})();
 
 // 「サンプルデータに戻す」ボタンのリスナー（4 画面共通仕様）。
-document.getElementById('btn-reset')?.addEventListener('click', () => {
-  if (!confirm('localStorage を削除し、サンプルデータに戻します。よろしいですか？')) return;
-  window.DataStore.reset();
+document.getElementById('btn-reset')?.addEventListener('click', async () => {
+  if (!confirm('データベースの内容を破棄し、サンプルデータに戻します。よろしいですか？')) return;
+  try {
+    await window.DataStore.reset();
+  } catch (e) {
+    console.error(e);
+    alert(`リセットに失敗しました: ${e.message}`);
+    return;
+  }
   window.location.reload();
 });

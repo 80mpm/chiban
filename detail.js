@@ -37,8 +37,15 @@ function showError(msg) {
   host.innerHTML = `<div class="error-card">${escHtml(msg)} <br><br><a href="index.html">← 案件一覧へ戻る</a></div>`;
 }
 
-(function main() {
-  const projects = window.DataStore.load();
+(async function main() {
+  let projects;
+  try {
+    projects = await window.DataStore.load();
+  } catch (e) {
+    console.error(e);
+    showError(`データの読み込みに失敗しました: ${e.message}`);
+    return;
+  }
   const projectId = getProjectId();
   const proj = projectId ? projects.find((p) => p.id === projectId) : null;
 
@@ -59,7 +66,7 @@ function showError(msg) {
 
   setupInfoCard(proj);
   setupMap(proj);
-  setupLandViews(proj);
+  setupLandViews(proj, projects);
 })();
 
 // ---------- 案件サマリー（住所・アクセス・総坪数・容積率・想定容積率） ----------
@@ -166,7 +173,7 @@ function setupMap(proj) {
 }
 
 // ---------- 公図風ビュー + 詳細カード ----------
-function setupLandViews(proj) {
+function setupLandViews(proj, projects) {
   // ---- 選択状態（公図風 SVG のハイライト） ----
   const svgPolyByLandId = new Map(); // landId → SVG polygon 要素
   let selectedLandId = null;
@@ -297,7 +304,7 @@ function setupLandViews(proj) {
     $('vf-submit').addEventListener('click', () => addVisitFromForm(land));
   }
 
-  function addVisitFromForm(land) {
+  async function addVisitFromForm(land) {
     const q = (id) => document.getElementById(id);
     const comment = q('vf-comment').value.trim();
     if (!comment) {
@@ -305,26 +312,24 @@ function setupLandViews(proj) {
       return;
     }
     const nextDateRaw = q('vf-next-date').value;
-    // proj は setupLandLayer のクロージャから引用。state.projects は読み込み直して最新化する。
-    const projects = window.DataStore.load();
-    const freshProj = projects.find((p) => p.id === proj.id);
-    if (!freshProj) return;
-    // 担当者名はフォームから廃止（user は addVisit 側で undefined のまま保存される）。
-    window.DataStore.addVisit(projects, freshProj.id, land.id, {
-      comment,
-      directOrTel: q('vf-direct').value || '',
-      meetingType: q('vf-meeting').value || '',
-      progress: q('vf-progress').value || '',
-      nextDate: nextDateRaw ? new Date(nextDateRaw).toISOString() : '',
-      principal: q('vf-principal').value || 'principal',
-    });
-    window.DataStore.save(projects);
-    // 元の proj.lands も同期（同じ参照を使い続けるパス用に手動で差し戻し）
-    const freshLand = freshProj.lands.find((l) => l.id === land.id);
-    const inMemoryLand = proj.lands.find((l) => l.id === land.id);
-    if (inMemoryLand && freshLand) inMemoryLand.visits = freshLand.visits;
-    renderVisits(freshLand);
-    renderVisitForm(freshLand);
+    // サーバへ追加し、成功すればローカルの land.visits にも反映される。
+    // 担当者名はフォームから廃止（user は未指定のまま保存される）。
+    try {
+      await window.DataStore.addVisit(projects, proj.id, land.id, {
+        comment,
+        directOrTel: q('vf-direct').value || '',
+        meetingType: q('vf-meeting').value || '',
+        progress: q('vf-progress').value || '',
+        nextDate: nextDateRaw ? new Date(nextDateRaw).toISOString() : '',
+        principal: q('vf-principal').value || 'principal',
+      });
+    } catch (e) {
+      console.error(e);
+      alert(`訪問記録の追加に失敗しました: ${e.message}`);
+      return;
+    }
+    renderVisits(land);
+    renderVisitForm(land);
   }
 
   // ---- 左ペイン: 土地ポリゴンから公図風ビュー（白地・北上の SVG）を生成 ----
@@ -557,8 +562,14 @@ function drawRoadWidthArrows(map, polygonPoints, frontRoads) {
 }
 
 // 「サンプルデータに戻す」ボタンのリスナー（4 画面共通仕様。common.js を読まないので個別実装）。
-document.getElementById('btn-reset')?.addEventListener('click', () => {
-  if (!confirm('localStorage を削除し、サンプルデータに戻します。よろしいですか？')) return;
-  window.DataStore.reset();
+document.getElementById('btn-reset')?.addEventListener('click', async () => {
+  if (!confirm('データベースの内容を破棄し、サンプルデータに戻します。よろしいですか？')) return;
+  try {
+    await window.DataStore.reset();
+  } catch (e) {
+    console.error(e);
+    alert(`リセットに失敗しました: ${e.message}`);
+    return;
+  }
   window.location.reload();
 });

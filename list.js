@@ -168,7 +168,7 @@ function openProjectCreateForm() {
     </div>
   `;
 
-  const saveBtn = makeBtn('作成', 'btn-primary', () => {
+  const saveBtn = makeBtn('作成', 'btn-primary', async () => {
     const errEl = document.getElementById('form-error');
     errEl.style.display = 'none';
 
@@ -181,8 +181,15 @@ function openProjectCreateForm() {
       return;
     }
 
-    const created = window.DataStore.createProject(state.projects, { name, description, polygon: null });
-    persist();
+    let created;
+    try {
+      created = await window.DataStore.createProject(state.projects, { name, description, polygon: null });
+    } catch (e) {
+      console.error(e);
+      errEl.textContent = `作成に失敗しました: ${e.message}`;
+      errEl.style.display = 'block';
+      return;
+    }
     toast('案件を作成しました');
     closeModal();
     window.location.href = `edit.html?projectId=${encodeURIComponent(created.id)}`;
@@ -201,9 +208,16 @@ function openProjectCreateForm() {
 }
 
 // ---------- 起動 ----------
-(function bootstrap() {
+(async function bootstrap() {
   const main = $('main');
   main.classList.add('list-mode');
+  try {
+    await initAppState();
+  } catch (e) {
+    console.error(e);
+    main.innerHTML = `<div class="card" style="margin:24px">データの読み込みに失敗しました: ${escHtml(e.message)}</div>`;
+    return;
+  }
   main.innerHTML = renderProjectsList();
   bindProjectsList();
 })();

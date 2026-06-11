@@ -1,0 +1,23 @@
+# ローカル開発用 PostgreSQL（案件・土地・訪問記録・筆マスタの永続化先）
+# 起動: docker compose up -d
+# 停止: docker compose down（データは volume に残る。完全に消すなら down -v）
+services:
+  db:
+    image: postgres:17
+    container_name: chiban-postgres
+    environment:
+      POSTGRES_USER: chiban
+      POSTGRES_PASSWORD: chiban
+      POSTGRES_DB: chiban
+    ports:
+      - "5432:5432"
+    volumes:
+      - chiban-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chiban -d chiban"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  chiban-pgdata:

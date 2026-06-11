@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-ZENRIN Maps API タイルプロキシ + 静的ファイルサーバ
+ZENRIN Maps API タイルプロキシ + 静的ファイルサーバ + データ API
+
+データ API（/api/*）は db.py（PostgreSQL）に委譲する JSON API。
+案件・土地・訪問記録・筆マスタを全画面で共有するためのバックエンド。
+事前に `docker compose up -d` で PostgreSQL を起動しておくこと。
 
 Leaflet の L.tileLayer は <img> 経由でタイルを取得するためカスタム HTTP ヘッダを
 付けられない。一方 ZENRIN Web API はタイル取得にカスタムヘッダ
@@ -26,17 +30,22 @@ Leaflet 側 URL:
     （ZENRIN は z/row/col = z/y/x の順）
 """
 
+import gzip
 import json
 import os
+import re
 import sys
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
 from base64 import b64encode
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
+
+import db as appdb
 
 
 # ----- 設定（環境変数）-----
@@ -101,13 +110,128 @@ class TokenCache:
 _token_cache = TokenCache()
 
 
+# ----- データ API ルーティング -----
+# (メソッド, パス正規表現) → ハンドラ。ハンドラは (conn, match, body, query) を受けて
+# (ステータス, レスポンス JSON) を返す。body は JSON デコード済み dict、
+# query は urllib.parse.parse_qs の結果（値はリスト）。
+def _parcels_handler(conn, m, b, q):
+    town = (q.get("town") or [None])[0]
+    if town:
+        # 町名単位の遅延取得（プルダウン用・属性のみ）
+        return 200, appdb.get_parcels_by_town(conn, town)
+    return 200, appdb.get_parcels(conn)
+
+
+API_ROUTES = [
+    ("GET", re.compile(r"^/api/parcel-towns$"),
+     lambda conn, m, b, q: (200, appdb.get_parcel_towns(conn))),
+    ("GET", re.compile(r"^/api/parcels$"), _parcels_handler),
+    ("GET", re.compile(r"^/api/projects$"),
+     lambda conn, m, b, q: (200, appdb.get_projects_tree(conn))),
+    ("POST", re.compile(r"^/api/projects$"),
+     lambda conn, m, b, q: (201, appdb.create_project(conn, b))),
+    ("PATCH", re.compile(r"^/api/projects/([^/]+)$"),
+     lambda conn, m, b, q: (200, appdb.update_project(conn, m.group(1), b))),
+    ("DELETE", re.compile(r"^/api/projects/([^/]+)$"),
+     lambda conn, m, b, q: (204, appdb.delete_project(conn, m.group(1)))),
+    ("POST", re.compile(r"^/api/projects/([^/]+)/lands$"),
+     lambda conn, m, b, q: (201, appdb.create_land(conn, m.group(1), b))),
+    ("PATCH", re.compile(r"^/api/projects/([^/]+)/lands/([^/]+)$"),
+     lambda conn, m, b, q: (200, appdb.update_land(conn, m.group(1), m.group(2), b))),
+    ("DELETE", re.compile(r"^/api/projects/([^/]+)/lands/([^/]+)$"),
+     lambda conn, m, b, q: (204, appdb.delete_land(conn, m.group(1), m.group(2)))),
+    ("POST", re.compile(r"^/api/projects/([^/]+)/lands/([^/]+)/visits$"),
+     lambda conn, m, b, q: (201, appdb.add_visit(conn, m.group(1), m.group(2), b))),
+    ("POST", re.compile(r"^/api/reset$"),
+     lambda conn, m, b, q: (200, appdb.reset_samples(conn))),
+]
+
+
 # ----- HTTP ハンドラ -----
 class TileProxyHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/tile/"):
             self._handle_tile()
             return
+        if self.path.startswith("/api/"):
+            self._handle_api("GET")
+            return
         super().do_GET()
+
+    def do_POST(self):
+        if self.path.startswith("/api/"):
+            self._handle_api("POST")
+            return
+        self.send_error(405, "Method Not Allowed")
+
+    def do_PATCH(self):
+        if self.path.startswith("/api/"):
+            self._handle_api("PATCH")
+            return
+        self.send_error(405, "Method Not Allowed")
+
+    def do_DELETE(self):
+        if self.path.startswith("/api/"):
+            self._handle_api("DELETE")
+            return
+        self.send_error(405, "Method Not Allowed")
+
+    # ---- データ API ----
+    def _handle_api(self, method):
+        path, _, query_str = self.path.partition("?")
+        query = urllib.parse.parse_qs(query_str)
+        for route_method, pattern, handler in API_ROUTES:
+            if route_method != method:
+                continue
+            m = pattern.match(path)
+            if not m:
+                continue
+            try:
+                body = self._read_json_body()
+                # with ブロック終了時に自動 commit（例外時は rollback）
+                with appdb.connect() as conn:
+                    status, payload = handler(conn, m, body, query)
+                self._send_json(status, payload)
+            except appdb.ApiError as e:
+                self._send_json(e.status, {"error": e.message})
+            except appdb.psycopg.OperationalError as e:
+                self._send_json(503, {
+                    "error": "データベースに接続できません。`docker compose up -d` で PostgreSQL を起動してください。"
+                })
+                sys.stderr.write(f"[api] DB connection error: {e}\n")
+            except Exception as e:
+                traceback.print_exc()
+                self._send_json(500, {"error": f"サーバエラー: {e}"})
+            return
+        self._send_json(404, {"error": "Not Found"})
+
+    def _read_json_body(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        if length == 0:
+            return {}
+        raw = self.rfile.read(length)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            raise appdb.ApiError(400, "リクエストボディが JSON として解釈できません")
+
+    def _send_json(self, status, payload):
+        body = b"" if status == 204 else json.dumps(
+            payload, ensure_ascii=False, default=str
+        ).encode("utf-8")
+        self.send_response(status)
+        if body:
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+        # 筆マスタ全件（/api/parcels）が 20MB 超になるため、大きな応答は gzip で返す
+        accept_gzip = "gzip" in (self.headers.get("Accept-Encoding") or "")
+        if body and accept_gzip and len(body) > 16 * 1024:
+            body = gzip.compress(body, compresslevel=6)
+            self.send_header("Content-Encoding", "gzip")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if body:
+            self.wfile.write(body)
 
     def _handle_tile(self):
         # /tile/{z}/{x}/{y}.png  (Leaflet 規約)
@@ -178,9 +302,22 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+
+    # データベース初期化（スキーマ作成・筆マスタ投入・初回サンプル投入）
+    try:
+        appdb.init_db()
+        print(f"  Database:     {appdb.DATABASE_URL}")
+    except appdb.psycopg.OperationalError as e:
+        print("エラー: PostgreSQL に接続できません。", file=sys.stderr)
+        print("  docker compose up -d  で起動してから再実行してください。", file=sys.stderr)
+        print(f"  接続先: {appdb.DATABASE_URL}", file=sys.stderr)
+        print(f"  詳細: {e}", file=sys.stderr)
+        sys.exit(1)
+
     server = ThreadingHTTPServer(("0.0.0.0", port), TileProxyHandler)
     print(f"Serving on http://localhost:{port}/")
     print(f"  Static files: ./")
+    print(f"  Data API:     /api/projects /api/parcels ほか（PostgreSQL）")
     print(
         f"  Tile proxy:   /tile/{{z}}/{{x}}/{{y}}.png  →  "
         f"https://{ZENRIN_DOMAIN}/map/wmts_tile/{ZENRIN_LAYER}/{ZENRIN_STYLE}/Z3857_3_21/..."
