@@ -104,3 +104,65 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ============================================================
+   公図風 SVG（KouzuView）— 旧 style.css .kouzu-host 周辺の移植
+   ============================================================ */
+.kouzu-host {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  overflow: hidden;
+}
+.kouzu-host svg {
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  max-width: 100%;
+  max-height: 100%;
+}
+svg polygon.fude {
+  cursor: pointer;
+  transition: fill-opacity 0.12s;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.2;
+}
+svg polygon.fude:hover {
+  fill-opacity: 0.65 !important;
+}
+svg polygon.fude-candidate {
+  fill: #94a3b8;
+  fill-opacity: 0.18;
+  stroke: #94a3b8;
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  transition: fill-opacity 0.12s;
+}
+svg polygon.fude-candidate:hover {
+  fill-opacity: 0.5;
+  stroke-width: 2;
+}
+svg polygon.fude.selected {
+  stroke-width: 3.5;
+  fill-opacity: 0.65 !important;
+}
+svg .fude-label {
+  font-weight: 700;
+  font-family: var(--font-sans);
+  fill: #1e293b;
+  paint-order: stroke fill;
+  stroke: #fff;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+}
+svg .north-mark {
+  fill: #94a3b8;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
