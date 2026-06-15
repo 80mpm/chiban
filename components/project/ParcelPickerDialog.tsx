@@ -108,7 +108,9 @@ export function ParcelPickerDialog({
         <div className="kouzu-host h-[60vh] p-0">
           <KouzuView
             interactive
-            showLandLabels={false}
+            labelMode="chiban"
+            showCandidateChiban
+            landColor="#065a82"
             lands={proj.lands ?? []}
             candidates={avail}
             selectedLandId={selectedLandId}

@@ -31,7 +31,9 @@ export function KouzuView({
   emptyText = "領域が設定された土地がありません",
   className,
   interactive = false,
-  showLandLabels = true,
+  labelMode = "full",
+  showCandidateChiban = false,
+  landColor,
 }: {
   lands: Land[];
   candidates?: CandidateParcel[];
@@ -41,8 +43,12 @@ export function KouzuView({
   emptyText?: string;
   className?: string;
   interactive?: boolean;
-  /** 土地ラベル（地番/地権者/坪数）を表示するか。筆選択モーダルでは色分けのみにするため false。 */
-  showLandLabels?: boolean;
+  /** 土地ラベル: full=地番/地権者/坪数, chiban=地番のみ, none=なし。筆選択モーダルは chiban。 */
+  labelMode?: "full" | "chiban" | "none";
+  /** 候補筆にも地番を描くか（筆選択モーダルで筆を識別するため）。 */
+  showCandidateChiban?: boolean;
+  /** 土地をステータス色でなく単色で塗る（筆選択モーダルで「案件対象か否か」だけ示すため）。 */
+  landColor?: string;
 }) {
   const drawLands = useMemo(
     () => lands.filter((l) => Array.isArray(l.polygon) && l.polygon.length >= 3),
@@ -184,38 +190,58 @@ export function KouzuView({
       {/* 候補筆（グレー）を先に描き、土地が上に重なるようにする */}
       {drawCands.map((cand) => {
         const pts = cand.polygon.map(toView);
+        const [cx, cy] = centroid(pts);
         return (
-          <polygon
-            key={`cand-${cand.parcelId}`}
-            className="fude-candidate"
-            points={pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ")}
-            onClick={(e) => {
-              e.stopPropagation();
-              guardClick(() => onCandidateClick?.(cand))();
-            }}
-          >
-            <title>{`${cand.chiban}（クリックで選択）`}</title>
-          </polygon>
+          <g key={`cand-${cand.parcelId}`}>
+            <polygon
+              className="fude-candidate"
+              points={pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ")}
+              onClick={(e) => {
+                e.stopPropagation();
+                guardClick(() => onCandidateClick?.(cand))();
+              }}
+            >
+              <title>{`${cand.chiban}（クリックで選択）`}</title>
+            </polygon>
+            {showCandidateChiban && (
+              <text
+                className="fude-label"
+                textAnchor="middle"
+                x={cx.toFixed(2)}
+                y={cy.toFixed(2)}
+                dominantBaseline="central"
+                fontSize={fontSize.toFixed(2)}
+                strokeWidth={(fontSize * 0.22).toFixed(2)}
+              >
+                {cand.chiban}
+              </text>
+            )}
+          </g>
         );
       })}
 
       {drawLands.map((land) => {
         const def = STATUS_DEFS[land.status] ?? STATUS_DEFS.target;
+        const color = landColor ?? def.color;
         const pts = land.polygon.map(toView);
         const [cx, cy] = centroid(pts);
         const ownerLines = (land.owners ?? [])
           .map((o) => (o?.name ? (o.share ? `${o.name}（${o.share}）` : o.name) : ""))
           .filter(Boolean);
-        const lines = [land.chiban || "—", ...ownerLines, `${land.areaTsubo}坪`];
+        // labelMode: full=地番+地権者+坪数 / chiban=地番のみ / none=なし
+        const lines =
+          labelMode === "chiban"
+            ? [land.chiban || "—"]
+            : [land.chiban || "—", ...ownerLines, `${land.areaTsubo}坪`];
         const startDy = -((lines.length - 1) / 2) * lineHeightEm;
         return (
           <g key={land.id}>
             <polygon
               className={`fude${selectedLandId === land.id ? " selected" : ""}`}
               points={pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ")}
-              fill={def.color}
+              fill={color}
               fillOpacity={0.4}
-              stroke={def.color}
+              stroke={color}
               onClick={(e) => {
                 e.stopPropagation();
                 guardClick(() => onSelectLand?.(land.id))();
@@ -223,7 +249,7 @@ export function KouzuView({
             >
               <title>{`${land.chiban || "—"} / ${def.label} / ${land.areaTsubo}坪`}</title>
             </polygon>
-            {showLandLabels && (
+            {labelMode !== "none" && (
               <text
                 className="fude-label"
                 textAnchor="middle"
