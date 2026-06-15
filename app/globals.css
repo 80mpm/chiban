@@ -166,3 +166,19 @@ svg .north-mark {
   pointer-events: none;
   user-select: none;
 }
+
+/* 案件一覧の地図ラベル（常時表示ツールチップ） */
+.leaflet-tooltip.list-map-label {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #1e293b;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+}
+.leaflet-tooltip.list-map-label::before {
+  display: none;
+}
