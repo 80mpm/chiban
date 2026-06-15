@@ -191,6 +191,10 @@ export function KouzuView({
     fn();
   };
 
+  // 土地のクリック選択が無い場合（筆選択モーダル）は土地を不活性にする
+  // （ホバーで色が変わったりポインターになって「押せそう」に見えるのを防ぐ）。
+  const landsInteractive = onSelectLand != null;
+
   const content = (
     <>
       {/* 候補筆（グレー）を先に描き、土地が上に重なるようにする */}
@@ -248,6 +252,7 @@ export function KouzuView({
               fill={color}
               fillOpacity={0.4}
               stroke={color}
+              style={landsInteractive ? undefined : { pointerEvents: "none", cursor: "default" }}
               onClick={(e) => {
                 e.stopPropagation();
                 guardClick(() => onSelectLand?.(land.id))();
