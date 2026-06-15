@@ -68,7 +68,7 @@ export function ParcelPickerDialog({
   const hint = isLoading
     ? "読み込み中…"
     : avail.length
-      ? `グレーの筆をクリックで${hintVerb}（${avail.length}筆）`
+      ? `グレーの筆をクリックで${hintVerb}`
       : "この町名に選べる筆がありません";
 
   async function handlePick(cand: CandidateParcel) {
@@ -98,7 +98,7 @@ export function ParcelPickerDialog({
             ) : (
               towns.map((t) => (
                 <option key={t.name} value={t.name}>
-                  {t.name}（{t.count}）
+                  {t.name}
                 </option>
               ))
             )}
