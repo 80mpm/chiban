@@ -15,9 +15,11 @@ import { toast } from "sonner";
 export function Topbar({
   screen,
   showReport = true,
+  showReset = true,
 }: {
   screen: string;
   showReport?: boolean;
+  showReset?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [resetting, setResetting] = useState(false);
@@ -68,14 +70,16 @@ export function Topbar({
         </span>
       </h1>
 
-      <button
-        type="button"
-        onClick={handleReset}
-        disabled={resetting}
-        className="cursor-pointer rounded-md border border-[rgba(248,113,113,.35)] bg-white/[.06] px-3 py-1.5 text-xs text-[#fecaca] transition-colors hover:bg-[rgba(248,113,113,.15)] hover:text-[#fca5a5] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {resetting ? "リセット中…" : "サンプルデータに戻す"}
-      </button>
+      {showReset && (
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={resetting}
+          className="cursor-pointer rounded-md border border-[rgba(248,113,113,.35)] bg-white/[.06] px-3 py-1.5 text-xs text-[#fecaca] transition-colors hover:bg-[rgba(248,113,113,.15)] hover:text-[#fca5a5] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {resetting ? "リセット中…" : "サンプルデータに戻す"}
+        </button>
+      )}
 
       {showReport && (
         <Link

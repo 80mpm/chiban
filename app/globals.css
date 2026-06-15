@@ -183,6 +183,27 @@ svg .north-mark {
   display: none;
 }
 
+/* 登記所備付地図ビューアの地番ラベル（ポリゴン中心の常時ツールチップ） */
+.leaflet-tooltip.map-label {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.leaflet-tooltip.map-label::before {
+  display: none;
+}
+.leaflet-tooltip.map-label.label-chiban {
+  font-weight: 700;
+  font-size: 10px;
+  text-shadow:
+    0 0 2px #fff,
+    0 0 2px #fff,
+    0 0 2px #fff,
+    0 0 2px #fff;
+}
+
 /* 案件詳細の地図ラベル（辺長 / 前面道路幅員）— divIcon に注入する HTML 用 */
 .edge-length-label {
   background: rgba(255, 255, 255, 0.95);
