@@ -12,7 +12,6 @@ export interface CandidateParcel {
   polygon: LatLng[];
 }
 
-const MIN_K = 1;
 const MAX_K = 12;
 const DRAG_THRESHOLD_PX = 4;
 
@@ -34,6 +33,8 @@ export function KouzuView({
   labelMode = "full",
   showCandidateChiban = false,
   landColor,
+  fitToLands = false,
+  minZoom = 1,
 }: {
   lands: Land[];
   candidates?: CandidateParcel[];
@@ -49,6 +50,10 @@ export function KouzuView({
   showCandidateChiban?: boolean;
   /** 土地をステータス色でなく単色で塗る（筆選択モーダルで「案件対象か否か」だけ示すため）。 */
   landColor?: string;
+  /** viewBox を案件の土地に合わせる（初期表示を土地までズームイン。候補筆はパン/ズームアウトで見える）。 */
+  fitToLands?: boolean;
+  /** ズームアウトの下限（fitToLands 時に町全体まで引けるよう小さくする）。 */
+  minZoom?: number;
 }) {
   const drawLands = useMemo(
     () => lands.filter((l) => Array.isArray(l.polygon) && l.polygon.length >= 3),
@@ -59,14 +64,15 @@ export function KouzuView({
     [candidates],
   );
 
-  const layout = useMemo(
-    () =>
-      computeKouzuLayout(
-        [...drawLands.map((l) => l.polygon), ...drawCands.map((c) => c.polygon)],
-        drawLands.map((l) => l.polygon),
-      ),
-    [drawLands, drawCands],
-  );
+  const layout = useMemo(() => {
+    const landPolys = drawLands.map((l) => l.polygon);
+    const candPolys = drawCands.map((c) => c.polygon);
+    // fitToLands: 案件の土地だけで viewBox を決める（候補筆は同じ toView で描かれ、
+    // viewBox 外はクリップ。パン/ズームアウトで見える）。土地が無ければ全体にフィット。
+    const fitPolys =
+      fitToLands && landPolys.length ? landPolys : [...landPolys, ...candPolys];
+    return computeKouzuLayout(fitPolys, landPolys);
+  }, [drawLands, drawCands, fitToLands]);
 
   // ----- 拡大縮小・移動の状態（interactive 時のみ使用） -----
   const svgRef = useRef<SVGSVGElement>(null);
@@ -104,7 +110,7 @@ export function KouzuView({
       if (!m) return;
       const { k, tx, ty } = viewRef.current;
       const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-      const k2 = Math.min(MAX_K, Math.max(MIN_K, k * factor));
+      const k2 = Math.min(MAX_K, Math.max(minZoom, k * factor));
       if (k2 === k) return;
       setView({
         k: k2,
@@ -114,7 +120,7 @@ export function KouzuView({
     };
     svg.addEventListener("wheel", onWheel, { passive: false });
     return () => svg.removeEventListener("wheel", onWheel);
-  }, [interactive]);
+  }, [interactive, minZoom]);
 
   function onPointerDown(e: React.PointerEvent) {
     if (!interactive) return;
@@ -146,7 +152,7 @@ export function KouzuView({
     const cx = layout.viewW / 2;
     const cy = layout.viewH / 2;
     setView((v) => {
-      const k2 = Math.min(MAX_K, Math.max(MIN_K, v.k * factor));
+      const k2 = Math.min(MAX_K, Math.max(minZoom, v.k * factor));
       if (k2 === v.k) return v;
       return { k: k2, tx: cx - (k2 / v.k) * (cx - v.tx), ty: cy - (k2 / v.k) * (cy - v.ty) };
     });

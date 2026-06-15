@@ -108,6 +108,8 @@ export function ParcelPickerDialog({
         <div className="kouzu-host h-[60vh] p-0">
           <KouzuView
             interactive
+            fitToLands
+            minZoom={0.1}
             labelMode="chiban"
             showCandidateChiban
             landColor="#065a82"
