@@ -1,5 +1,12 @@
 HANDOFF.md
 .env
+.env*.local
+
+# Next.js / Node
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
 # 登記所備付地図データ原本（14MB）— 変換結果の kouzu_xml_data.js のみコミットする
 kouzu/
 # 台東区全図面の筆マスタシード（tools/convert_kouzu_seed.py で kouzu/ から再生成可能）
