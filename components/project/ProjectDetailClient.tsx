@@ -86,7 +86,7 @@ export function ProjectDetailClient({
         <ProjectAreaMap project={proj} />
 
         {selectedLand && (
-          <div className="absolute inset-0 z-[600] overflow-y-auto bg-white p-4 text-xs text-[#1e293b] shadow-[-2px_0_10px_rgba(0,0,0,.1)]">
+          <div className="absolute inset-0 z-[1001] overflow-y-auto bg-white p-4 text-xs text-[#1e293b] shadow-[-2px_0_10px_rgba(0,0,0,.1)]">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h4 className="flex-1 text-[15px] font-bold text-[#21295c]">
                 地番 {[selectedLand.aza, selectedLand.chiban].filter(Boolean).join(" ") || "—"}
