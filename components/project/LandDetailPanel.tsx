@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { InlineTextField } from "@/components/InlineTextField";
 import { ParcelPickerDialog } from "@/components/project/ParcelPickerDialog";
 import { useProjectMutations } from "@/hooks/use-projects";
-import { STATUS_DEFS, STATUS_KEYS, formatOwners, parseOwners, fmtDateTime, fmtDateOnly } from "@/lib/format";
+import { STATUS_DEFS, STATUS_KEYS, formatOwners, parseOwners, fmtDateTime, fmtDateOnly, fmtTsubo } from "@/lib/format";
 import type { Project, Land } from "@/lib/types";
 
 const dash = (s: string) => s || "—";
@@ -97,7 +97,7 @@ export function LandDetailPanel({
           type="number"
           placeholder="例：45"
           value={land.areaTsubo}
-          formatDisplay={(v) => `${v} 坪`}
+          formatDisplay={(v) => `${fmtTsubo(v)} 坪`}
           onConfirm={(next) => {
             const t = next.trim();
             if (t === "") return save({ areaTsubo: 0 });

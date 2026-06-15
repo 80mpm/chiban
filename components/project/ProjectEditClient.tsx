@@ -11,7 +11,7 @@ import { StatusBar } from "@/components/project/StatusBar";
 import { LandDetailPanel } from "@/components/project/LandDetailPanel";
 import { ParcelPickerDialog } from "@/components/project/ParcelPickerDialog";
 import { useProjects, useProjectMutations } from "@/hooks/use-projects";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDateTime, fmtTsubo } from "@/lib/format";
 import type { Project, LatLng } from "@/lib/types";
 
 const PolygonDrawMap = dynamic(() => import("@/components/map/PolygonDrawMap"), {
@@ -235,7 +235,7 @@ export function ProjectEditClient({
             <div className="text-sm">{dash(fmtDateTime(proj.updatedAt ?? proj.createdAt))}</div>
 
             <label className={fieldLabel}>土地数</label>
-            <div className="text-sm">{total} 件 / 合計 {totalTsubo} 坪</div>
+            <div className="text-sm">{total} 件 / 合計 {fmtTsubo(totalTsubo)} 坪</div>
           </div>
         </div>
       </div>

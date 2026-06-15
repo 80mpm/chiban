@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { KouzuView } from "@/components/kouzu/KouzuView";
 import { VisitAddForm } from "@/components/project/VisitAddForm";
 import { useProjects } from "@/hooks/use-projects";
-import { STATUS_DEFS, formatOwners, fmtDateTime, fmtDateOnly } from "@/lib/format";
+import { STATUS_DEFS, formatOwners, fmtDateTime, fmtDateOnly, fmtTsubo } from "@/lib/format";
 import type { Project, Visit } from "@/lib/types";
 
 const ProjectAreaMap = dynamic(() => import("@/components/map/ProjectAreaMap"), {
@@ -113,7 +113,7 @@ export function ProjectDetailClient({
               <div className="text-[11px] text-[#64748b]">地権者</div>
               <div>{formatOwners(selectedLand.owners) || "—"}</div>
               <div className="text-[11px] text-[#64748b]">坪数</div>
-              <div>{selectedLand.areaTsubo} 坪</div>
+              <div>{fmtTsubo(selectedLand.areaTsubo)} 坪</div>
               <div className="text-[11px] text-[#64748b]">概要</div>
               <div>{selectedLand.description || "—"}</div>
               <div className="text-[11px] text-[#64748b]">登録日</div>

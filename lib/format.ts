@@ -41,6 +41,13 @@ export function parseOwners(text: string): Owner[] {
     });
 }
 
+/** 坪数を小数点以下2桁までで整形する（合計値の浮動小数誤差も丸める。末尾0は省く）。 */
+export function fmtTsubo(v: number | string | null | undefined): string {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "0";
+  return String(Math.round(n * 100) / 100);
+}
+
 /** 地番の自然順ソートキー（例: 2-10 は 2-9 の後）。 */
 export function chibanSortKey(chiban: string): number {
   const [main, branch] = String(chiban).split("-");

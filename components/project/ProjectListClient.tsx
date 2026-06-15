@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useProjects } from "@/hooks/use-projects";
 import { StatusBar } from "@/components/project/StatusBar";
 import { ProjectCreateDialog } from "@/components/project/ProjectCreateDialog";
-import { fmtDateOnly } from "@/lib/format";
+import { fmtDateOnly, fmtTsubo } from "@/lib/format";
 import type { Project, LatLng } from "@/lib/types";
 
 // Leaflet は window 前提なので SSR 無効で読み込む
@@ -129,7 +129,7 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                     <span>{total} 件</span>
                     <span>·</span>
-                    <span>{totalTsubo(p)} 坪</span>
+                    <span>{fmtTsubo(totalTsubo(p))} 坪</span>
                     <span>·</span>
                     <span>更新 {fmtDateOnly(p.updatedAt ?? p.createdAt)}</span>
                   </div>

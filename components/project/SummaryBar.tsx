@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fmtTsubo } from "@/lib/format";
 import type { Project } from "@/lib/types";
 
 function SumItem({
@@ -40,7 +41,7 @@ export function SummaryBar({ project }: { project: Project }) {
     <div className="flex flex-none flex-col border-b border-[#d4dde6] bg-white">
       <div className="flex items-stretch">
         <SumItem label="住所" value={project.address} flex="2 1 0" />
-        <SumItem label="総坪数" value={totalTsubo > 0 ? `${totalTsubo} 坪` : null} />
+        <SumItem label="総坪数" value={totalTsubo > 0 ? `${fmtTsubo(totalTsubo)} 坪` : null} />
         <SumItem label="容積率" value={project.currentFar != null ? `${project.currentFar}%` : null} />
         <SumItem label="想定容積率" value={project.targetFar != null ? `${project.targetFar}%` : null} />
         <Link

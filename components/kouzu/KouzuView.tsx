@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { STATUS_DEFS } from "@/lib/format";
+import { STATUS_DEFS, fmtTsubo } from "@/lib/format";
 import type { Land, LatLng } from "@/lib/types";
 import { computeKouzuLayout, centroid } from "./kouzu-geom";
 
@@ -242,7 +242,7 @@ export function KouzuView({
         const lines =
           labelMode === "chiban"
             ? [land.chiban || "—"]
-            : [land.chiban || "—", ...ownerLines, `${land.areaTsubo}坪`];
+            : [land.chiban || "—", ...ownerLines, `${fmtTsubo(land.areaTsubo)}坪`];
         const startDy = -((lines.length - 1) / 2) * lineHeightEm;
         return (
           <g key={land.id}>
@@ -258,7 +258,7 @@ export function KouzuView({
                 guardClick(() => onSelectLand?.(land.id))();
               }}
             >
-              <title>{`${land.chiban || "—"} / ${def.label} / ${land.areaTsubo}坪`}</title>
+              <title>{`${land.chiban || "—"} / ${def.label} / ${fmtTsubo(land.areaTsubo)}坪`}</title>
             </polygon>
             {labelMode !== "none" && (
               <text
