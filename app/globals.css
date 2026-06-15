@@ -182,3 +182,35 @@ svg .north-mark {
 .leaflet-tooltip.list-map-label::before {
   display: none;
 }
+
+/* 案件詳細の地図ラベル（辺長 / 前面道路幅員）— divIcon に注入する HTML 用 */
+.edge-length-label {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #065a82;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transform: translate(-50%, -50%);
+  display: inline-block;
+  line-height: 1;
+  pointer-events: none;
+}
+.road-width-label {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #b91c1c;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #b91c1c;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  transform: translate(-50%, -50%);
+  display: inline-block;
+  line-height: 1;
+  pointer-events: none;
+}
