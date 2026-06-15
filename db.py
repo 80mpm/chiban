@@ -126,10 +126,8 @@ CREATE TABLE IF NOT EXISTS projects (
 
 CREATE TABLE IF NOT EXISTS lands (
     id          text PRIMARY KEY,
-    seq         integer GENERATED ALWAYS AS IDENTITY,  -- 表示順（追加順）
     project_id  integer NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     parcel_id   integer NOT NULL REFERENCES parcels(id),
-    owners      jsonb NOT NULL DEFAULT '[]',
     description text NOT NULL DEFAULT '',
     area_tsubo  numeric NOT NULL DEFAULT 0,
     status      text NOT NULL DEFAULT 'target' CHECK (status IN ('target', 'acquired')),
@@ -137,11 +135,21 @@ CREATE TABLE IF NOT EXISTS lands (
     updated_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (project_id, parcel_id)
 );
-CREATE INDEX IF NOT EXISTS idx_lands_project ON lands (project_id, seq);
+CREATE INDEX IF NOT EXISTS idx_lands_project ON lands (project_id, created_at);
+
+CREATE TABLE IF NOT EXISTS land_owners (
+    id      integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- 追加順（= owners 配列の並び）
+    land_id text NOT NULL REFERENCES lands(id) ON DELETE CASCADE,
+    name      text NOT NULL,
+    share_num integer,                        -- 持分の分子（持分指定なしは NULL）
+    share_den integer,                        -- 持分の分母（持分指定なしは NULL）
+    CHECK ((share_num IS NULL) = (share_den IS NULL)),  -- 分子・分母は揃って指定/未指定
+    CHECK (share_den IS NULL OR share_den > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_land_owners_land ON land_owners (land_id, id);
 
 CREATE TABLE IF NOT EXISTS visits (
     id            text PRIMARY KEY,
-    seq           integer GENERATED ALWAYS AS IDENTITY,  -- 表示順（追加順）
     land_id       text NOT NULL REFERENCES lands(id) ON DELETE CASCADE,
     user_name     text NOT NULL DEFAULT '',
     comment       text NOT NULL DEFAULT '',
@@ -152,7 +160,7 @@ CREATE TABLE IF NOT EXISTS visits (
     progress      text NOT NULL DEFAULT '',
     principal     text NOT NULL DEFAULT 'principal'
 );
-CREATE INDEX IF NOT EXISTS idx_visits_land ON visits (land_id, seq);
+CREATE INDEX IF NOT EXISTS idx_visits_land ON visits (land_id, date);
 
 CREATE TABLE IF NOT EXISTS app_meta (
     key   text PRIMARY KEY,
@@ -419,7 +427,15 @@ def _project_json(row, lands=None):
 
 
 _LAND_SELECT = """
-    SELECT l.*, c.name AS aza, p.chiban, p.geometry
+    SELECT l.*, c.name AS aza, p.chiban, p.geometry,
+           COALESCE((
+             SELECT jsonb_agg(jsonb_build_object(
+                      'name', o.name,
+                      'share', CASE WHEN o.share_num IS NOT NULL
+                                    THEN o.share_num || '/' || o.share_den ELSE '' END
+                    ) ORDER BY o.id)
+               FROM land_owners o WHERE o.land_id = l.id
+           ), '[]'::jsonb) AS owners
       FROM lands l
       JOIN parcels p ON p.id = l.parcel_id
       JOIN chibankuiki c ON c.id = p.chibankuiki_id
@@ -509,8 +525,8 @@ def get_parcels(conn):
 def get_projects_tree(conn):
     """全案件を lands・visits 込みのツリーで返す（3 クエリで組み立て）。"""
     proj_rows = conn.execute("SELECT * FROM projects ORDER BY id").fetchall()
-    land_rows = conn.execute(_LAND_SELECT + " ORDER BY l.project_id, l.seq").fetchall()
-    visit_rows = conn.execute("SELECT * FROM visits ORDER BY land_id, seq").fetchall()
+    land_rows = conn.execute(_LAND_SELECT + " ORDER BY l.project_id, l.created_at, l.id").fetchall()
+    visit_rows = conn.execute("SELECT * FROM visits ORDER BY land_id, date, id").fetchall()
 
     visits_by_land = {}
     for v in visit_rows:
@@ -584,6 +600,33 @@ def delete_project(conn, project_id):
 # 土地 CRUD
 # ============================================================
 
+def _parse_share(share):
+    """持分文字列 '1520/6755' → (分子, 分母)。分数として解釈できなければ (None, None)。"""
+    s = (share or "").strip()
+    if "/" not in s:
+        return None, None
+    num, _, den = s.partition("/")
+    try:
+        num, den = int(num.strip()), int(den.strip())
+    except ValueError:
+        return None, None
+    return (num, den) if den > 0 else (None, None)
+
+
+def _replace_owners(conn, land_id, owners):
+    """土地の地権者を全置換する（DELETE 旧 + INSERT 新）。name 空は捨てる。"""
+    conn.execute("DELETE FROM land_owners WHERE land_id = %s", (land_id,))
+    for o in owners or []:
+        name = (o.get("name") or "").strip()
+        if not name:
+            continue
+        num, den = _parse_share(o.get("share"))
+        conn.execute(
+            "INSERT INTO land_owners (land_id, name, share_num, share_den) VALUES (%s, %s, %s, %s)",
+            (land_id, name, num, den),
+        )
+
+
 def _fetch_parcel(conn, parcel_id):
     row = conn.execute(
         "SELECT * FROM parcels WHERE id = %s", (_parse_parcel_id(parcel_id),)
@@ -613,18 +656,19 @@ def create_land(conn, project_id, fields):
     area = fields.get("areaTsubo")
     if area is None:
         area = polygon_area_tsubo(parcel_ring(parcel["geometry"]))
+    land_id = _uuid()
     try:
         conn.execute(
-            """INSERT INTO lands (id, project_id, parcel_id, owners, description, area_tsubo, status)
-               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+            """INSERT INTO lands (id, project_id, parcel_id, description, area_tsubo, status)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
             (
-                _uuid(), pid, parcel["id"],
-                Jsonb(fields.get("owners") or []), fields.get("description") or "",
-                area, status,
+                land_id, pid, parcel["id"],
+                fields.get("description") or "", area, status,
             ),
         )
     except psycopg.errors.UniqueViolation:
         raise ApiError(409, "この筆はすでにこの案件に追加済みです")
+    _replace_owners(conn, land_id, fields.get("owners"))
     row = conn.execute(
         _LAND_SELECT + " WHERE l.project_id = %s AND l.parcel_id = %s",
         (pid, parcel["id"]),
@@ -644,8 +688,7 @@ def update_land(conn, project_id, land_id, fields):
         sets += ["parcel_id = %s", "area_tsubo = %s"]
         params += [parcel["id"], polygon_area_tsubo(parcel_ring(parcel["geometry"]))]
     if "owners" in fields:
-        sets.append("owners = %s")
-        params.append(Jsonb(fields["owners"] if isinstance(fields["owners"], list) else []))
+        _replace_owners(conn, land_id, fields["owners"] if isinstance(fields["owners"], list) else [])
     if "description" in fields:
         sets.append("description = %s")
         params.append(fields["description"] or "")
@@ -972,15 +1015,16 @@ def _insert_samples(conn):
         for land in proj["lands"]:
             land_id = _uuid()
             conn.execute(
-                """INSERT INTO lands (id, project_id, parcel_id, owners, description,
+                """INSERT INTO lands (id, project_id, parcel_id, description,
                                       area_tsubo, status, created_at, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                 (
-                    land_id, proj["id"], land["parcelId"], Jsonb(land["owners"]),
+                    land_id, proj["id"], land["parcelId"],
                     land["description"], land["areaTsubo"], land["status"],
                     land["createdAt"], land["updatedAt"],
                 ),
             )
+            _replace_owners(conn, land_id, land["owners"])
             for v in land["visits"]:
                 conn.execute(
                     """INSERT INTO visits (id, land_id, user_name, comment, date,
@@ -1001,7 +1045,7 @@ def _insert_samples(conn):
 
 def reset_samples(conn):
     """案件・土地・訪問記録を破棄してサンプルを再投入する（筆マスタは残す）。"""
-    conn.execute("TRUNCATE visits, lands, projects RESTART IDENTITY CASCADE")
+    conn.execute("TRUNCATE visits, land_owners, lands, projects RESTART IDENTITY CASCADE")
     _insert_samples(conn)
     conn.execute(
         """INSERT INTO app_meta (key, value) VALUES ('seeded', '1')
@@ -1022,6 +1066,14 @@ def _check_schema_version(conn):
     ).fetchone():
         raise RuntimeError(
             "旧スキーマのデータベースです。"
+            "`docker compose down -v && docker compose up -d` で初期化してから再起動してください"
+        )
+    if conn.execute(
+        """SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'lands' AND column_name = 'owners'"""
+    ).fetchone():
+        raise RuntimeError(
+            "旧スキーマ（lands.owners）のデータベースです。"
             "`docker compose down -v && docker compose up -d` で初期化してから再起動してください"
         )
 

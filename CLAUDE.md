@@ -308,6 +308,9 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
   `aza` / `chiban` / `polygon` はマスタからの導出値（API が読み出しのたびに parcels・chibankuiki
   から再導出する。lands テーブルには保存しない）。`aza` は地番区域名（chibankuiki.name。
   位置参照情報の漢数字表記。例「西浅草二丁目」）
+- `owners[{name, share}]` は `land_owners` テーブルに正規化されている（lands に jsonb では持たない）。
+  API は読み出し時に追加順（IDENTITY PK の id 順）で集約して land JSON にネストして返し、更新時は土地ごとに全置換する。
+  そのためフロント（`DataStore.formatOwners`/`parseOwners` 等）から見た形は従来どおり配列のまま
 - **ID は意味を持たないサロゲートキー**（設計原則）。住所マスタ・筆マスタの id はすべて IDENTITY の
   連番で、JIS コード・町名・地番はただの属性 + UNIQUE 制約。ID から業務情報を読み取る・ID に
   業務情報を埋め込むコードを書いてはならない（旧 `図面ID:地番` 形式は丁目をまたぐ図面で衝突し
@@ -328,10 +331,11 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `chibankuiki` | id (IDENTITY PK), shikuchoson_id (FK), choaza_code, name, lat, lng | 地番区域（大字町丁目）マスタ。choaza_code は大字町丁目コード12桁の下6桁（国土地理協会コード互換）。name は位置参照情報の表記そのまま（例 '下谷一丁目'）。`UNIQUE (shikuchoson_id, choaza_code)`・`UNIQUE (shikuchoson_id, name)`。住所マスタ 3 テーブルは初回起動時に `13106_2025.csv` から投入 |
 | `parcels` | id (IDENTITY PK), chibankuiki_id (FK), chiban, geometry (jsonb) | 筆マスタ。初回起動時に `kouzu_parcels_seed.json.gz`（なければ `kouzu_xml_data.js`）から COPY で投入。`UNIQUE (chibankuiki_id, chiban)`（地番は地番区域内で一意）。PK はサロゲートキー（業務属性を含まない） |
 | `projects` | id (IDENTITY), name, description, polygon (jsonb), address, access, current_far, target_far, front_roads (jsonb), created_at, updated_at | 案件。API では id を文字列で返す |
-| `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), owners (jsonb), description, area_tsubo, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)` で案件内の筆重複を防止 |
+| `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_tsubo, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)` で案件内の筆重複を防止。地権者は `land_owners` に正規化 |
+| `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 地権者マスタ。visits と同じ正規化テーブル（`land_id` FK・ON DELETE CASCADE）。表示順は IDENTITY PK の `id`（追加順）で保持。持分は分子 `share_num`・分母 `share_den` の整数 2 列で保持（持分指定なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。API では land JSON に `owners[{name, share}]` として `id` 順で集約して返す（`share` は `'分子/分母'` の文字列に再構成。持分なしは `''`）。更新は土地ごとに全置換で、受け取った `share` 文字列を `_parse_share` で分子・分母に分解して格納 |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
 
-- 案件・土地の削除はカスケード（案件削除で土地・訪問記録も消える）
+- 案件・土地の削除はカスケード（案件削除で土地・訪問記録・地権者も消える）
 - 旧 localStorage（キー `chibanDemoData_v3`）は廃止。ブラウザに残っていても読まれない
 
 ## ステータス定義
