@@ -3,132 +3,13 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { InlineTextField } from "@/components/InlineTextField";
+import { ParcelPickerDialog } from "@/components/project/ParcelPickerDialog";
 import { useProjectMutations } from "@/hooks/use-projects";
-import { useParcelTowns, useParcelsByTown } from "@/hooks/use-parcels";
 import { STATUS_DEFS, STATUS_KEYS, formatOwners, parseOwners, fmtDateTime, fmtDateOnly } from "@/lib/format";
 import type { Project, Land } from "@/lib/types";
 
 const dash = (s: string) => s || "—";
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
-
-/** 筆の付け替え行（町名 → 地番のプルダウン）。 */
-function ParcelChangeRow({
-  proj,
-  land,
-  onConfirm,
-  onEditingChange,
-}: {
-  proj: Project;
-  land: Land;
-  onConfirm: (parcelId: number) => Promise<void>;
-  onEditingChange: (editing: boolean) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [town, setTown] = useState(land.aza);
-  const [parcelId, setParcelId] = useState<number | null>(land.parcelId);
-  const { data: towns } = useParcelTowns(editing);
-  const { data: parcels, isLoading } = useParcelsByTown(editing ? town : null);
-
-  const usedIds = new Set(
-    (proj.lands ?? []).filter((l) => l.id !== land.id).map((l) => l.parcelId),
-  );
-  const avail = (parcels ?? []).filter((p) => !usedIds.has(p.parcelId));
-
-  function begin() {
-    setTown(land.aza);
-    setParcelId(land.parcelId);
-    setEditing(true);
-    onEditingChange(true);
-  }
-  function cancel() {
-    setEditing(false);
-    onEditingChange(false);
-  }
-  async function confirm() {
-    if (parcelId == null) return;
-    setEditing(false);
-    onEditingChange(false);
-    await onConfirm(parcelId);
-  }
-
-  if (!editing) {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="rounded bg-[color:var(--app-status-acquired)]/10 px-2 py-0.5 text-xs font-medium text-status-acquired">
-          {landTitle(land)}
-        </span>
-        <button
-          type="button"
-          onClick={begin}
-          className="rounded-md border border-border bg-white px-2 py-0.5 text-xs hover:bg-secondary"
-        >
-          筆を変更
-        </button>
-      </div>
-    );
-  }
-
-  const selCls =
-    "rounded-md border border-input bg-white px-1.5 py-1 text-xs outline-none focus:ring-2 focus:ring-[color:var(--ring)]";
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <select
-        className={selCls}
-        value={town}
-        disabled={!towns}
-        onChange={(e) => {
-          setTown(e.target.value);
-          setParcelId(null);
-        }}
-      >
-        {!towns ? (
-          <option>読み込み中…</option>
-        ) : (
-          towns.map((t) => (
-            <option key={t.name} value={t.name}>
-              {t.name}
-            </option>
-          ))
-        )}
-      </select>
-      <select
-        className={selCls}
-        value={parcelId ?? ""}
-        disabled={isLoading}
-        onChange={(e) => setParcelId(e.target.value ? Number(e.target.value) : null)}
-      >
-        {isLoading ? (
-          <option value="">読み込み中…</option>
-        ) : avail.length ? (
-          avail.map((p) => (
-            <option key={p.parcelId} value={p.parcelId}>
-              {p.chiban}
-            </option>
-          ))
-        ) : (
-          <option value="">（この町名の筆はすべて追加済み）</option>
-        )}
-      </select>
-      <button
-        type="button"
-        onClick={confirm}
-        disabled={parcelId == null}
-        className="flex size-6 items-center justify-center rounded-md bg-brand text-white hover:opacity-90 disabled:opacity-50"
-        title="確定"
-      >
-        ✓
-      </button>
-      <button
-        type="button"
-        onClick={cancel}
-        className="flex size-6 items-center justify-center rounded-md bg-secondary text-muted-foreground hover:bg-secondary/80"
-        title="取消"
-      >
-        ✕
-      </button>
-    </div>
-  );
-}
 
 /** 選択中の土地の詳細パネル（旧 edit.js setupLandDetailPanel）。 */
 export function LandDetailPanel({
@@ -141,7 +22,7 @@ export function LandDetailPanel({
   onDeleteLand: (landId: string) => void;
 }) {
   const { updateLand } = useProjectMutations();
-  const [editingParcel, setEditingParcel] = useState(false);
+  const [changeOpen, setChangeOpen] = useState(false);
 
   if (!land) {
     return (
@@ -190,14 +71,18 @@ export function LandDetailPanel({
 
       <div className="grid grid-cols-[88px_1fr] items-center gap-x-2.5 gap-y-2 text-sm">
         <label className={labelCls}>筆（地番）</label>
-        <ParcelChangeRow
-          proj={proj}
-          land={land}
-          onEditingChange={setEditingParcel}
-          onConfirm={async (parcelId) => {
-            await save({ parcelId });
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-[color:var(--app-status-acquired)]/10 px-2 py-0.5 text-xs font-medium text-status-acquired">
+            {landTitle(land)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setChangeOpen(true)}
+            className="rounded-md border border-border bg-white px-2 py-0.5 text-xs hover:bg-secondary"
+          >
+            筆を変更
+          </button>
+        </div>
 
         <label className={labelCls}>地権者</label>
         <InlineTextField
@@ -260,13 +145,27 @@ export function LandDetailPanel({
       <div className="mt-3">
         <button
           type="button"
-          disabled={editingParcel}
           onClick={() => onDeleteLand(land.id)}
-          className="rounded-md border border-[#fca5a5] bg-white px-3 py-1.5 text-xs text-[#dc2626] hover:bg-[#fef2f2] disabled:opacity-50"
+          className="rounded-md border border-[#fca5a5] bg-white px-3 py-1.5 text-xs text-[#dc2626] hover:bg-[#fef2f2]"
         >
           この土地を削除
         </button>
       </div>
+
+      {/* 筆を変更: 土地追加と同じ公図ピッカー（対象土地をハイライト・選んで閉じる） */}
+      <ParcelPickerDialog
+        open={changeOpen}
+        onOpenChange={setChangeOpen}
+        proj={proj}
+        title="筆を変更"
+        defaultTownName={land.aza}
+        selectedLandId={land.id}
+        hintVerb="変更"
+        keepOpenAfterPick={false}
+        onPick={async (cand) => {
+          await save({ parcelId: cand.parcelId });
+        }}
+      />
     </div>
   );
 }

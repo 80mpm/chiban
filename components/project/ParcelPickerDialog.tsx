@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,44 +8,54 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { KouzuView, type CandidateParcel } from "@/components/kouzu/KouzuView";
-import { useProjectMutations } from "@/hooks/use-projects";
 import { useParcelTowns, useParcelsByTownWithPolygons } from "@/hooks/use-parcels";
 import type { Project } from "@/lib/types";
 
-/** 案件内で最も使われている町名（無ければ最初の町名）を初期値にする。 */
-function defaultTown(proj: Project, towns: { name: string }[] | undefined): string {
-  const counts = new Map<string, number>();
-  for (const l of proj.lands ?? []) {
-    if (l.aza) counts.set(l.aza, (counts.get(l.aza) ?? 0) + 1);
-  }
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-  return top ?? towns?.[0]?.name ?? "";
-}
-
 /**
- * 土地追加のワイドモーダル（旧 edit.js openLandAddModal）。
- * 町名を選ぶと候補筆がグレー表示され、クリックでその場で追加（連続追加可）。
+ * 公図ポリゴンから筆を選ぶワイドモーダル（土地追加・筆変更で共用）。
+ * 町名を選ぶと候補筆がグレー表示され、クリックで onPick が呼ばれる。
+ * 拡大縮小・移動はモーダル内の公図ビューでのみ有効（KouzuView interactive）。
+ *
+ * - 追加: keepOpenAfterPick=true（連続追加）
+ * - 筆変更: keepOpenAfterPick=false（1件選んで閉じる）。selectedLandId で対象土地をハイライト
  */
-export function LandAddDialog({
+export function ParcelPickerDialog({
   open,
   onOpenChange,
   proj,
-  onLandAdded,
+  title,
+  defaultTownName,
+  selectedLandId = null,
+  hintVerb,
+  keepOpenAfterPick,
+  onPick,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   proj: Project;
-  onLandAdded: (landId: string) => void;
+  title: string;
+  defaultTownName: string;
+  selectedLandId?: string | null;
+  hintVerb: string;
+  keepOpenAfterPick: boolean;
+  onPick: (cand: CandidateParcel) => Promise<void>;
 }) {
-  const { createLand } = useProjectMutations();
   const { data: towns } = useParcelTowns(open);
   const [town, setTown] = useState<string | null>(null);
-  const effectiveTown = town ?? (open ? defaultTown(proj, towns) : null);
+
+  // 開くたびに町名を既定値へリセットする（筆変更で対象土地が変わっても追従）
+  useEffect(() => {
+    if (open) setTown(null);
+  }, [open]);
+
+  const effectiveTown =
+    town ?? (open ? defaultTownName || towns?.[0]?.name || null : null);
 
   const { data: parcels, isLoading } = useParcelsByTownWithPolygons(
     open ? effectiveTown : null,
   );
 
+  // 案件内で使用中の全 parcelId を候補から除外（重複・現筆への無変更を防ぐ）
   const usedIds = useMemo(
     () => new Set((proj.lands ?? []).map((l) => l.parcelId)),
     [proj.lands],
@@ -59,34 +68,26 @@ export function LandAddDialog({
   const hint = isLoading
     ? "読み込み中…"
     : avail.length
-      ? `グレーの筆をクリックで追加（${avail.length}筆）`
-      : "この町名の筆はすべて追加済みです";
+      ? `グレーの筆をクリックで${hintVerb}（${avail.length}筆）`
+      : "この町名に選べる筆がありません";
 
-  async function addCandidate(cand: CandidateParcel) {
-    try {
-      const land = await createLand.mutateAsync({
-        projectId: proj.id,
-        fields: { parcelId: cand.parcelId, status: "target" },
-      });
-      toast.success(`${land.aza} ${land.chiban} を追加しました（領域・坪数は筆マスタから自動設定）`);
-      onLandAdded(land.id);
-    } catch (e) {
-      toast.error(`追加に失敗しました: ${e instanceof Error ? e.message : e}`);
-    }
+  async function handlePick(cand: CandidateParcel) {
+    await onPick(cand);
+    if (!keepOpenAfterPick) onOpenChange(false);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>土地を追加</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="mb-2 flex items-center gap-3">
-          <label htmlFor="land-add-town" className="text-sm font-medium">
+          <label htmlFor="parcel-picker-town" className="text-sm font-medium">
             町名・丁目
           </label>
           <select
-            id="land-add-town"
+            id="parcel-picker-town"
             value={effectiveTown ?? ""}
             disabled={!towns}
             onChange={(e) => setTown(e.target.value)}
@@ -104,11 +105,13 @@ export function LandAddDialog({
           </select>
           <span className="text-xs text-muted-foreground">{hint}</span>
         </div>
-        <div className="kouzu-host h-[60vh]">
+        <div className="kouzu-host h-[60vh] p-0">
           <KouzuView
+            interactive
             lands={proj.lands ?? []}
             candidates={avail}
-            onCandidateClick={addCandidate}
+            selectedLandId={selectedLandId}
+            onCandidateClick={handlePick}
             emptyText={"この町名の候補筆がありません。\n別の町名を選んでください。"}
           />
         </div>

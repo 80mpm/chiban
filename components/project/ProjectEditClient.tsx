@@ -9,7 +9,7 @@ import { InlineTextField } from "@/components/InlineTextField";
 import { KouzuView } from "@/components/kouzu/KouzuView";
 import { StatusBar } from "@/components/project/StatusBar";
 import { LandDetailPanel } from "@/components/project/LandDetailPanel";
-import { LandAddDialog } from "@/components/project/LandAddDialog";
+import { ParcelPickerDialog } from "@/components/project/ParcelPickerDialog";
 import { useProjects, useProjectMutations } from "@/hooks/use-projects";
 import { fmtDateTime } from "@/lib/format";
 import type { Project, LatLng } from "@/lib/types";
@@ -30,7 +30,7 @@ export function ProjectEditClient({
 }) {
   const router = useRouter();
   const { data: projects = [] } = useProjects(initialProjects);
-  const { updateProject, deleteProject, deleteLand } = useProjectMutations();
+  const { createLand, updateProject, deleteProject, deleteLand } = useProjectMutations();
   const proj = projects.find((p) => p.id === projectId);
 
   const [selectedLandId, setSelectedLandId] = useState<string | null>(null);
@@ -51,6 +51,26 @@ export function ProjectEditClient({
   const acquired = lands.filter((l) => l.status === "acquired").length;
   const pct = total === 0 ? 0 : Math.round((acquired / total) * 100);
   const totalTsubo = lands.reduce((s, l) => s + (Number(l.areaTsubo) || 0), 0);
+
+  // 土地追加モーダルの初期町名（案件内で最も使われている aza）
+  const defaultAddTown = (() => {
+    const counts = new Map<string, number>();
+    for (const l of lands) if (l.aza) counts.set(l.aza, (counts.get(l.aza) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+  })();
+
+  async function addParcel(cand: { parcelId: number }) {
+    try {
+      const land = await createLand.mutateAsync({
+        projectId,
+        fields: { parcelId: cand.parcelId, status: "target" },
+      });
+      toast.success(`${land.aza} ${land.chiban} を追加しました（領域・坪数は筆マスタから自動設定）`);
+      setSelectedLandId(land.id);
+    } catch (e) {
+      toast.error(`追加に失敗しました: ${e instanceof Error ? e.message : e}`);
+    }
+  }
 
   async function saveProject(fields: Partial<Project>): Promise<boolean> {
     setSaveStatus("保存中…");
@@ -256,7 +276,16 @@ export function ProjectEditClient({
         </button>
       </div>
 
-      <LandAddDialog open={addOpen} onOpenChange={setAddOpen} proj={proj} onLandAdded={setSelectedLandId} />
+      <ParcelPickerDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        proj={proj}
+        title="土地を追加"
+        defaultTownName={defaultAddTown}
+        hintVerb="追加"
+        keepOpenAfterPick
+        onPick={addParcel}
+      />
     </main>
   );
 }
