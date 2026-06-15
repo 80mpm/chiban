@@ -31,6 +31,7 @@ export function KouzuView({
   emptyText = "領域が設定された土地がありません",
   className,
   interactive = false,
+  showLandLabels = true,
 }: {
   lands: Land[];
   candidates?: CandidateParcel[];
@@ -40,6 +41,8 @@ export function KouzuView({
   emptyText?: string;
   className?: string;
   interactive?: boolean;
+  /** 土地ラベル（地番/地権者/坪数）を表示するか。筆選択モーダルでは色分けのみにするため false。 */
+  showLandLabels?: boolean;
 }) {
   const drawLands = useMemo(
     () => lands.filter((l) => Array.isArray(l.polygon) && l.polygon.length >= 3),
@@ -220,24 +223,26 @@ export function KouzuView({
             >
               <title>{`${land.chiban || "—"} / ${def.label} / ${land.areaTsubo}坪`}</title>
             </polygon>
-            <text
-              className="fude-label"
-              textAnchor="middle"
-              x={cx.toFixed(2)}
-              y={cy.toFixed(2)}
-              fontSize={fontSize.toFixed(2)}
-              strokeWidth={(fontSize * 0.22).toFixed(2)}
-            >
-              {lines.map((line, i) => (
-                <tspan
-                  key={i}
-                  x={cx.toFixed(2)}
-                  dy={i === 0 ? `${startDy.toFixed(2)}em` : `${lineHeightEm}em`}
-                >
-                  {line}
-                </tspan>
-              ))}
-            </text>
+            {showLandLabels && (
+              <text
+                className="fude-label"
+                textAnchor="middle"
+                x={cx.toFixed(2)}
+                y={cy.toFixed(2)}
+                fontSize={fontSize.toFixed(2)}
+                strokeWidth={(fontSize * 0.22).toFixed(2)}
+              >
+                {lines.map((line, i) => (
+                  <tspan
+                    key={i}
+                    x={cx.toFixed(2)}
+                    dy={i === 0 ? `${startDy.toFixed(2)}em` : `${lineHeightEm}em`}
+                  >
+                    {line}
+                  </tspan>
+                ))}
+              </text>
+            )}
           </g>
         );
       })}
