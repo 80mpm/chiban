@@ -5,6 +5,8 @@
 
 import { sql } from "../db/client";
 import { ensureDbReady } from "../db/init";
+import { ApiError } from "../api-error";
+import { parseProjectId } from "./helpers";
 import {
   landJson,
   projectJson,
@@ -62,4 +64,85 @@ export async function getProjectsTree(): Promise<Project[]> {
   }
 
   return projRows.map((p) => projectJson(p, landsByProj.get(p.id) ?? []));
+}
+
+// ============================================================
+// 案件 CRUD（db.py の create_project / update_project / delete_project の移植）
+// ============================================================
+
+interface ProjectFields {
+  name?: string;
+  description?: string;
+  polygon?: unknown;
+  address?: string | null;
+  access?: string | null;
+  currentFar?: number | null;
+  targetFar?: number | null;
+  frontRoads?: unknown;
+}
+
+export async function createProject(fields: ProjectFields): Promise<Project> {
+  await ensureDbReady();
+  const name = (fields.name ?? "").trim();
+  if (!name) throw new ApiError(400, "案件名は必須です");
+  const [row] = await sql<ProjectRow[]>`
+    INSERT INTO projects (name, description, polygon)
+    VALUES (
+      ${name}, ${fields.description ?? ""},
+      ${fields.polygon ? sql.json(fields.polygon as never) : null}
+    ) RETURNING *
+  `;
+  return projectJson(row, []);
+}
+
+export async function updateProject(
+  projectId: string,
+  fields: Record<string, unknown>,
+): Promise<Project> {
+  await ensureDbReady();
+  const pid = parseProjectId(projectId);
+  if ("name" in fields && !((fields.name as string) ?? "").trim()) {
+    throw new ApiError(400, "案件名は必須です");
+  }
+
+  // 現在値を読み、PATCH に含まれたキーだけ上書きして全カラムを書き戻す。
+  // jsonb 列は sql.json で渡す（安全テンプレートなので RETURNING で正しく parse される）。
+  const [cur] = await sql<ProjectRow[]>`SELECT * FROM projects WHERE id = ${pid}`;
+  if (!cur) throw new ApiError(404, "案件が見つかりません");
+
+  const has = (k: string) => k in fields;
+  const name = has("name") ? String(fields.name).trim() : cur.name;
+  const description = has("description") ? (fields.description ?? "") : cur.description;
+  const polygon = has("polygon") ? fields.polygon || null : cur.polygon;
+  const address = has("address") ? (fields.address ?? null) : cur.address;
+  const access = has("access") ? (fields.access ?? null) : cur.access;
+  const currentFar = has("currentFar") ? (fields.currentFar ?? null) : cur.current_far;
+  const targetFar = has("targetFar") ? (fields.targetFar ?? null) : cur.target_far;
+  const frontRoads = has("frontRoads")
+    ? Array.isArray(fields.frontRoads)
+      ? fields.frontRoads
+      : []
+    : cur.front_roads;
+
+  const [row] = await sql<ProjectRow[]>`
+    UPDATE projects SET
+      name = ${name},
+      description = ${description as never},
+      polygon = ${polygon ? sql.json(polygon as never) : null},
+      address = ${address as never},
+      access = ${access as never},
+      current_far = ${currentFar as never},
+      target_far = ${targetFar as never},
+      front_roads = ${sql.json(frontRoads as never)},
+      updated_at = now()
+    WHERE id = ${pid} RETURNING *
+  `;
+  return projectJson(row); // lands はクライアント側で保持しているので含めない
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  await ensureDbReady();
+  const pid = parseProjectId(projectId);
+  const res = await sql`DELETE FROM projects WHERE id = ${pid}`;
+  if (res.count === 0) throw new ApiError(404, "案件が見つかりません");
 }
