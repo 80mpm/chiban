@@ -42,7 +42,7 @@
     return (Number(main) || 0) * 100000 + (Number(branch) || 0);
   }
 
-  // 町名（大字+丁目・半角正規化済み）の一覧。土地追加モーダル・筆変更プルダウンに使う。
+  // 町名（地番区域名）の一覧。土地の追加モード・筆変更プルダウンに使う。
   async function parcelTowns() {
     if (!_towns) {
       const towns = await api('GET', '/api/parcel-towns');
@@ -60,6 +60,18 @@
       _parcelsByTown.set(name, parcels);
     }
     return _parcelsByTown.get(name);
+  }
+
+  // 指定町名の筆一覧（領域 [[lat,lng]] 付き）。土地の追加モード（公図ビューの候補筆表示）用。
+  // 属性のみのキャッシュとは別に持つ（プルダウンだけの用途で重い応答を取らないため）。
+  const _parcelPolysByTown = new Map();  // 町名 → [{ parcelId, chiban, polygon }]
+  async function parcelsByTownWithPolygons(name) {
+    if (!_parcelPolysByTown.has(name)) {
+      const parcels = await api('GET', `/api/parcels?town=${encodeURIComponent(name)}&geometry=1`);
+      parcels.sort((a, b) => chibanSortKey(a.chiban) - chibanSortKey(b.chiban));
+      _parcelPolysByTown.set(name, parcels);
+    }
+    return _parcelPolysByTown.get(name);
   }
 
   // ---------- 幾何ヘルパー ----------
@@ -96,6 +108,7 @@
     polygonAreaTsubo,
     parcelTowns,
     parcelsByTown,
+    parcelsByTownWithPolygons,
 
     // ----- 地権者ヘルパ -----
     // owners 配列を表示用文字列に整形する。

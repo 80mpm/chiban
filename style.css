@@ -422,7 +422,7 @@ select.pill-select option {
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0,0,0,.3);
 }
-.modal.wide { width: 760px; }
+.modal.wide { width: min(1200px, calc(100vw - 48px)); }
 .modal-header {
   padding: 14px 20px;
   border-bottom: 1px solid #e2e8f0;
@@ -514,6 +514,20 @@ select.pill-select option {
   stroke-width: 1.2;
 }
 .kouzu-host svg polygon.fude:hover { fill-opacity: 0.65 !important; }
+/* 追加モードで選択中の町名の候補筆（クリックでそのまま土地として追加） */
+.kouzu-host svg polygon.fude-candidate {
+  fill: #94a3b8;
+  fill-opacity: 0.18;
+  stroke: #94a3b8;
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  transition: fill-opacity .12s;
+}
+.kouzu-host svg polygon.fude-candidate:hover {
+  fill-opacity: 0.5;
+  stroke-width: 2;
+}
 .kouzu-host svg polygon.fude.selected {
   stroke-width: 3.5;
   fill-opacity: 0.65 !important;
@@ -535,6 +549,31 @@ select.pill-select option {
 .kouzu-empty {
   color: #94a3b8; font-size: 13px;
   text-align: center; padding: 40px 20px; line-height: 1.7;
+}
+
+/* ========== 案件編集 上部 2カラム（左=領域マップ / 右=案件情報） ========== */
+.proj-top-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+.proj-top-split .card { margin-bottom: 0; }
+/* 左の領域マップは右の案件情報カードと同じ高さまで伸ばす */
+.proj-top-split .proj-map-card { display: flex; flex-direction: column; }
+.proj-top-split .proj-map-card .detail-map { flex: 1; height: auto; min-height: 420px; }
+/* 案件情報カード上部のコンパクトな取得状況 */
+.acquire-progress {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0; border-radius: 6px;
+}
+.acquire-progress .progress-info { margin-bottom: 6px; font-size: 12px; }
+.acquire-progress .progress-info .pct { font-size: 15px; }
+@media (max-width: 1100px) {
+  .proj-top-split { grid-template-columns: 1fr; }
 }
 
 /* ========== 公図風ビュー + 詳細パネル 2カラム ========== */
@@ -589,15 +628,32 @@ select.pill-select option {
   display: flex; gap: 6px; flex-wrap: wrap;
   margin-top: 12px;
 }
-.land-panel-external-actions {
-  display: flex; justify-content: flex-end; gap: 8px;
-  min-height: 0;
-}
 .land-card-header { gap: 16px; }
 .land-card-header .land-card-tools {
   flex: 1;
   display: flex; align-items: center; gap: 14px;
   flex-wrap: wrap; justify-content: space-between;
+}
+/* 土地の追加モーダル（町名プルダウン + 大きな公図ビュー。候補筆クリックで追加） */
+.land-add-modal-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px;
+}
+.land-add-modal-bar label {
+  font-size: 12px; color: #475569; font-weight: 600;
+}
+.land-add-modal-bar select {
+  padding: 5px 8px;
+  border: 1px solid #cbd5e1; border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+}
+.land-add-hint {
+  color: #64748b; font-size: 12px;
+}
+.kouzu-host-modal {
+  height: calc(100vh - 290px);
+  min-height: 320px; max-height: none;
 }
 .land-split .land-panel-visits .visit {
   margin-bottom: 6px;

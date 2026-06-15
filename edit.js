@@ -30,10 +30,21 @@ function renderEdit() {
   bindProjectDetail(proj);
 }
 
+// 取得状況（案件情報カード上部のコンパクト表示。refreshAcquireProgress でも使う）
+function renderAcquireProgress(proj) {
+  const c = countLandStatuses(proj);
+  const total = proj.lands.length;
+  const pct = total === 0 ? 0 : Math.round((c.acquired / total) * 100);
+  return `
+    <div class="progress-info">
+      <span>取得状況：取得済 <strong>${c.acquired}</strong> / ${total} 件</span>
+      <span class="pct ${total === 0 || c.acquired === 0 ? 'zero' : ''}">${pct}%</span>
+    </div>
+    ${renderStatusBar(proj, { compact: true })}`;
+}
+
 // ---------- 案件編集ビューの本体 ----------
 function renderProjectDetail(proj) {
-  const c = countLandStatuses(proj);
-
   return `
     <div class="page-header">
       <div>
@@ -47,68 +58,61 @@ function renderProjectDetail(proj) {
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header">
-        <h3>案件情報</h3>
-        <span class="save-status" id="save-status"></span>
-      </div>
-      <div class="form-grid proj-info-grid">
-        <label>案件名 <span class="required">*</span></label>
-        <div class="value field-cell" id="field-name"></div>
-
-        <label>概要</label>
-        <div class="value field-cell" id="field-description"></div>
-
-        <label>所在地</label>
-        <div class="value field-cell" id="field-address"></div>
-
-        <label>アクセス</label>
-        <div class="value field-cell" id="field-access"></div>
-
-        <label>現況容積率</label>
-        <div class="value field-cell" id="field-current-far"></div>
-
-        <label>想定容積率</label>
-        <div class="value field-cell" id="field-target-far"></div>
-
-        <label>登録日</label>
-        <div class="value">${fmtDate(proj.createdAt)}</div>
-
-        <label>更新日</label>
-        <div class="value" id="proj-updated">${fmtDate(proj.updatedAt || proj.createdAt)}</div>
-
-        <label>土地数</label>
-        <div class="value">${proj.lands.length} 件 / 合計 ${totalAreaTsubo(proj)} 坪</div>
-      </div>
-      <div class="inline-error" id="form-error" style="display:none"></div>
-    </div>
-
-    <div class="card">
-      <h3>取得状況</h3>
-      <div class="progress-info">
-        <span>取得済 <strong>${c.acquired}</strong> / ${proj.lands.length} 件</span>
-        <span class="pct ${proj.lands.length === 0 || c.acquired === 0 ? 'zero' : ''}">${proj.lands.length === 0 ? 0 : Math.round((c.acquired / proj.lands.length) * 100)}%</span>
-      </div>
-      ${renderStatusBar(proj)}
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <h3>領域マップ</h3>
-        <div class="poly-toolbar">
-          <span class="save-status" id="poly-status">未設定</span>
-          <button class="btn btn-sm" id="poly-draw">＋ ポリゴンを描く</button>
-          <button class="btn btn-sm btn-danger" id="poly-clear" style="display:none">クリア</button>
+    <div class="proj-top-split">
+      <div class="card proj-map-card">
+        <div class="card-header">
+          <h3>領域マップ</h3>
+          <div class="poly-toolbar">
+            <span class="save-status" id="poly-status">未設定</span>
+            <button class="btn btn-sm" id="poly-draw">＋ ポリゴンを描く</button>
+            <button class="btn btn-sm btn-danger" id="poly-clear" style="display:none">クリア</button>
+          </div>
         </div>
+        <div id="detail-map" class="detail-map"></div>
       </div>
-      <div id="detail-map" class="detail-map"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>案件情報</h3>
+          <span class="save-status" id="save-status"></span>
+        </div>
+        <div class="acquire-progress" id="acquire-progress">${renderAcquireProgress(proj)}</div>
+        <div class="form-grid proj-info-grid">
+          <label>案件名 <span class="required">*</span></label>
+          <div class="value field-cell" id="field-name"></div>
+
+          <label>概要</label>
+          <div class="value field-cell" id="field-description"></div>
+
+          <label>所在地</label>
+          <div class="value field-cell" id="field-address"></div>
+
+          <label>アクセス</label>
+          <div class="value field-cell" id="field-access"></div>
+
+          <label>現況容積率</label>
+          <div class="value field-cell" id="field-current-far"></div>
+
+          <label>想定容積率</label>
+          <div class="value field-cell" id="field-target-far"></div>
+
+          <label>登録日</label>
+          <div class="value">${fmtDate(proj.createdAt)}</div>
+
+          <label>更新日</label>
+          <div class="value" id="proj-updated">${fmtDate(proj.updatedAt || proj.createdAt)}</div>
+
+          <label>土地数</label>
+          <div class="value">${proj.lands.length} 件 / 合計 ${totalAreaTsubo(proj)} 坪</div>
+        </div>
+        <div class="inline-error" id="form-error" style="display:none"></div>
+      </div>
     </div>
 
     <div class="card">
       <div class="card-header land-card-header">
         <h3>土地</h3>
         <div class="land-card-tools">
-          <div class="land-panel-external-actions" id="detail-land-panel-actions"></div>
           <button class="btn btn-primary btn-sm" id="btn-new-land">＋ 土地を追加</button>
         </div>
       </div>
@@ -126,7 +130,7 @@ function renderProjectDetail(proj) {
 
 function bindProjectDetail(proj) {
   $('btn-delete-project').addEventListener('click', () => deleteProjectConfirm(proj.id));
-  $('btn-new-land').addEventListener('click', () => openLandCreateForm(proj.id));
+  $('btn-new-land').addEventListener('click', () => openLandAddModal());
 
   // ---------- インライン編集（案件情報・領域マップ） ----------
   const errEl = $('form-error');
@@ -273,15 +277,8 @@ function bindProjectDetail(proj) {
   }
 
   function refreshAcquireProgress() {
-    const c = countLandStatuses(proj);
-    const wrap = document.querySelector('.card .progress-info');
-    if (wrap) {
-      wrap.innerHTML = `
-        <span>取得済 <strong>${c.acquired}</strong> / ${proj.lands.length} 件</span>
-        <span class="pct ${proj.lands.length === 0 || c.acquired === 0 ? 'zero' : ''}">${proj.lands.length === 0 ? 0 : Math.round((c.acquired / proj.lands.length) * 100)}%</span>`;
-    }
-    const bar = document.querySelector('.status-bar');
-    if (bar) bar.outerHTML = renderStatusBar(proj);
+    const box = document.getElementById('acquire-progress');
+    if (box) box.innerHTML = renderAcquireProgress(proj);
   }
 
   const panel = setupLandDetailPanel('detail-land-panel', proj, {
@@ -298,6 +295,114 @@ function bindProjectDetail(proj) {
       panel.selectLand(landId);
     },
   });
+
+  // ---------- 土地の追加モーダル（大きな公図ビューから筆を選んで追加） ----------
+  // 「＋ 土地を追加」でワイドモーダルを開き、町名を選ぶと候補筆がグレー表示される。
+  // 候補筆をクリックするとその場で追加（連続追加可）。「閉じる」で終了する。
+  async function openLandAddModal() {
+    let towns;
+    try {
+      towns = await window.DataStore.parcelTowns();
+    } catch (e) {
+      console.error(e);
+      toast(`町名一覧の取得に失敗しました: ${e.message}`);
+      return;
+    }
+    // 町名は案件内の既存の土地で最も使われているものを初期値にする
+    const azaCounts = new Map();
+    proj.lands.forEach(l => {
+      if (l.aza) azaCounts.set(l.aza, (azaCounts.get(l.aza) || 0) + 1);
+    });
+    const defaultAza = [...azaCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+      || towns[0]?.name || '';
+
+    const body = `
+      <div class="land-add-modal-bar">
+        <label for="land-add-town">町名・丁目</label>
+        <select id="land-add-town">${towns.map(t =>
+          `<option value="${escHtml(t.name)}"${t.name === defaultAza ? ' selected' : ''}>${escHtml(t.name)}</option>`
+        ).join('')}</select>
+        <span class="land-add-hint" id="land-add-hint">読み込み中…</span>
+      </div>
+      <div id="land-add-kouzu" class="kouzu-host kouzu-host-modal"></div>
+    `;
+
+    let modalView = null;
+    let avail = [];
+    let token = 0;
+
+    openModal({
+      title: '土地を追加',
+      body,
+      wide: true,
+      footer: [makeBtn('閉じる', '', closeModal)],
+      onClose: () => {
+        token++;  // 取得中の応答を無効化
+        modalView?.destroy?.();
+        modalView = null;
+      },
+    });
+
+    function setHint(text) {
+      const hint = document.getElementById('land-add-hint');
+      if (hint) hint.textContent = text;
+    }
+
+    async function addLandFromCandidate(cand) {
+      let land;
+      try {
+        land = await window.DataStore.createLand(state.projects, proj.id, {
+          parcelId: cand.parcelId, status: 'target',
+        });
+      } catch (e) {
+        console.error(e);
+        toast(`追加に失敗しました: ${e.message}`);
+        return;
+      }
+      toast(`${land.aza} ${land.chiban} を追加しました（領域・坪数は筆マスタから自動設定）`);
+      // 追加した筆を候補から外して再描画し、続けて隣の筆を追加できるようにする
+      avail = avail.filter(p => p.parcelId !== cand.parcelId);
+      setHint(avail.length
+        ? `グレーの筆をクリックで追加（${avail.length}筆）`
+        : 'この町名の筆はすべて追加済みです');
+      modalView?.setCandidates?.(avail);
+      // 背後の公図ビュー・パネル・取得状況にも反映する
+      kouzuView?.refresh?.();
+      kouzuView?.selectLand?.(land.id);
+      panel.selectLand(land.id);
+      refreshAcquireProgress();
+    }
+
+    modalView = setupKouzuView('land-add-kouzu', proj, {
+      onCandidateClick: (cand) => addLandFromCandidate(cand),
+    });
+
+    async function refreshCandidates() {
+      const townEl = document.getElementById('land-add-town');
+      if (!townEl) return;
+      const myToken = ++token;
+      setHint('読み込み中…');
+      let parcels;
+      try {
+        parcels = await window.DataStore.parcelsByTownWithPolygons(townEl.value);
+      } catch (e) {
+        console.error(e);
+        if (myToken === token) setHint('筆一覧の取得に失敗しました');
+        return;
+      }
+      // 町名の連続切り替え・モーダルを閉じた後に届いた古い応答は捨てる
+      if (myToken !== token || !modalView) return;
+      const usedIds = new Set(proj.lands.map(l => l.parcelId));
+      avail = parcels.filter(p => !usedIds.has(p.parcelId));
+      setHint(avail.length
+        ? `グレーの筆をクリックで追加（${avail.length}筆）`
+        : 'この町名の筆はすべて追加済みです');
+      modalView.setCandidates(avail);
+    }
+
+    document.getElementById('land-add-town')?.addEventListener('change', refreshCandidates);
+    refreshCandidates();
+  }
 }
 
 // ---------- 土地詳細パネル ----------
@@ -313,15 +418,11 @@ function setupLandDetailPanel(panelId, proj, {
   let currentLandId = null;
   let isEditingPolygon = false;  // 筆の付け替えプルダウンを表示中か
 
-  const externalActions = document.getElementById(`${panelId}-actions`)
-    || document.getElementById('detail-land-panel-actions');
-
   function renderEmpty() {
     currentLandId = null;
     host.innerHTML = `
       <div class="land-panel-empty">公図ビュー上の筆をクリックして土地を選択してください</div>
     `;
-    if (externalActions) externalActions.innerHTML = '';
   }
 
   function renderLand(landId) {
@@ -376,11 +477,11 @@ function setupLandDetailPanel(panelId, proj, {
                   <div class="cdate">${fmtDate(v.date)}</div>
                 </div>`).join('')}
         </div>
+        <div class="land-panel-actions">
+          <button class="btn btn-sm btn-danger" data-act="delete">この土地を削除</button>
+        </div>
       </div>
     `;
-    if (externalActions) {
-      externalActions.innerHTML = `<button class="btn btn-sm btn-danger" data-act="delete">この土地を削除</button>`;
-    }
     bindPanelEvents(land);
   }
 
@@ -533,7 +634,7 @@ function setupLandDetailPanel(panelId, proj, {
   }
 
   function refreshDeleteButton() {
-    const btn = externalActions?.querySelector('[data-act="delete"]');
+    const btn = host.querySelector('[data-act="delete"]');
     if (btn) btn.disabled = isEditingPolygon;
   }
 
@@ -579,7 +680,7 @@ function setupLandDetailPanel(panelId, proj, {
 
     renderParcelRow();
     refreshDeleteButton();
-    externalActions?.querySelector('[data-act="delete"]')?.addEventListener('click', () => {
+    host.querySelector('[data-act="delete"]')?.addEventListener('click', () => {
       if (isEditingPolygon) return;
       onDeleteLand?.(land.id);
     });
@@ -617,7 +718,8 @@ function setupLandDetailPanel(panelId, proj, {
 // ---------- 公図風ビュー（土地ポリゴンの SVG 表示・クリック選択） ----------
 // 案件詳細画面と同じ見た目: 白地・北上の SVG に各 land の polygon をステータス色で描画し、
 // 中心に地番・地権者・坪数ラベルを重ねる。筆クリックで onSelect(landId) を呼ぶ。
-function setupKouzuView(hostId, proj, { onSelect } = {}) {
+// 土地追加モーダルでは候補筆をグレーで重ね、クリックで onCandidateClick(parcel) を呼ぶ。
+function setupKouzuView(hostId, proj, { onSelect, onCandidateClick } = {}) {
   const noop = { refresh: () => {}, selectLand: () => {}, destroy: () => {} };
   const host = document.getElementById(hostId);
   if (!host) return noop;
@@ -625,6 +727,9 @@ function setupKouzuView(hostId, proj, { onSelect } = {}) {
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const polyByLandId = new Map();
   let selectedLandId = null;
+  // 土地追加モーダルで選択中の町名の候補筆（[{ parcelId, chiban, polygon }]）。
+  // 案件の土地の下にグレーで重ね、クリックでそのまま土地として追加できる。
+  let candidates = [];
 
   function selectLand(landId) {
     if (selectedLandId && polyByLandId.has(selectedLandId)) {
@@ -641,13 +746,17 @@ function setupKouzuView(hostId, proj, { onSelect } = {}) {
     const lands = (proj.lands || []).filter(
       (l) => Array.isArray(l.polygon) && l.polygon.length >= 3
     );
-    if (lands.length === 0) {
-      host.innerHTML = '<div class="kouzu-empty">領域が設定された土地がありません。<br>右のパネルの「筆を選ぶ」で土地に筆を割り当ててください。</div>';
+    const cands = candidates.filter(
+      (c) => Array.isArray(c.polygon) && c.polygon.length >= 3
+    );
+    if (lands.length === 0 && cands.length === 0) {
+      host.innerHTML = '<div class="kouzu-empty">土地がありません。<br>「＋ 土地を追加」で町名を選び、公図ビューに表示される筆をクリックして追加してください。</div>';
       return;
     }
 
     // 緯度経度 → ローカル平面メートル座標（重心緯度での正距円筒近似）。北が上。
-    const allPts = lands.flatMap((l) => l.polygon);
+    // 候補筆も表示範囲に含める（候補が別の町でも見切れないように）
+    const allPts = lands.concat(cands).flatMap((l) => l.polygon);
     const lat0 = allPts.reduce((s, p) => s + p[0], 0) / allPts.length;
     const lng0 = allPts.reduce((s, p) => s + p[1], 0) / allPts.length;
     const M_PER_LAT = 111320;
@@ -676,11 +785,28 @@ function setupKouzuView(hostId, proj, { onSelect } = {}) {
 
     const tx = ([x, y]) => [x - minX + pad, y - minY + pad];
 
-    // ラベル文字サイズは平均筆サイズ基準（単位はメートル）
-    const avgAreaM2 = lands.reduce(
+    // ラベル文字サイズは平均筆サイズ基準（単位はメートル）。土地が無く候補のみの場合は範囲基準
+    const labelBase = lands.length ? lands : cands;
+    const avgAreaM2 = labelBase.reduce(
       (s, l) => s + window.DataStore.polygonAreaTsubo(l.polygon) * 3.305785, 0
-    ) / lands.length;
+    ) / labelBase.length;
     const fontSize = Math.min(extent / 30, Math.sqrt(avgAreaM2) * 0.16);
+
+    // 候補筆（グレー）を先に描き、案件の土地が上に重なるようにする
+    cands.forEach((cand) => {
+      const pts = cand.polygon.map(toXY).map(tx);
+      const polygon = document.createElementNS(SVG_NS, 'polygon');
+      polygon.setAttribute('class', 'fude-candidate');
+      polygon.setAttribute('points', pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' '));
+      const title = document.createElementNS(SVG_NS, 'title');
+      title.textContent = `${cand.chiban}（クリックで追加）`;
+      polygon.appendChild(title);
+      polygon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onCandidateClick?.(cand);
+      });
+      svg.appendChild(polygon);
+    });
 
     lands.forEach((land) => {
       const def = STATUS_DEFS[land.status] || STATUS_DEFS.target;
@@ -755,6 +881,8 @@ function setupKouzuView(hostId, proj, { onSelect } = {}) {
   return {
     refresh: build,
     selectLand,
+    // 土地追加モーダルから呼ぶ。候補筆を入れ替えて再描画する（空配列でクリア）
+    setCandidates: (list) => { candidates = Array.isArray(list) ? list : []; build(); },
     destroy: () => host.replaceChildren(),
   };
 }
@@ -908,120 +1036,6 @@ async function deleteProjectConfirm(projectId) {
   }
   toast('案件を削除しました');
   window.location.href = 'index.html';
-}
-
-async function openLandCreateForm(projectId) {
-  const proj = state.projects.find(p => p.id === projectId);
-  if (!proj) return;
-
-  // 町名一覧は遅延取得（初回のみ API。以後はキャッシュ）
-  let towns;
-  try {
-    towns = await window.DataStore.parcelTowns();
-  } catch (e) {
-    console.error(e);
-    toast(`町名一覧の取得に失敗しました: ${e.message}`);
-    return;
-  }
-
-  const statusOptions = STATUS_KEYS.map(k =>
-    `<option value="${k}" ${k === 'target' ? 'selected' : ''}>${STATUS_DEFS[k].label}</option>`
-  ).join('');
-
-  // 町名は案件内の既存の土地で最も使われているものを初期値にする
-  const azaCounts = new Map();
-  proj.lands.forEach(l => {
-    if (l.aza) azaCounts.set(l.aza, (azaCounts.get(l.aza) || 0) + 1);
-  });
-  const defaultAza = [...azaCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-
-  // 筆マスタからの選択のみ。存在しない土地は選択できず、土地は必ず領域を持つ。
-  const body = `
-    <div id="form-error" class="form-error" style="display:none"></div>
-    <div class="form-grid-2">
-      <div class="form-row">
-        <label>町名・丁目</label>
-        <select id="f-aza">${towns.map(t =>
-          `<option value="${escHtml(t.name)}"${t.name === defaultAza ? ' selected' : ''}>${escHtml(t.name)}</option>`
-        ).join('')}</select>
-      </div>
-      <div class="form-row">
-        <label>地番 <span style="color:#ef4444">*</span></label>
-        <select id="f-parcel" disabled></select>
-      </div>
-    </div>
-    <div class="form-row">
-      <label>ステータス</label>
-      <select id="f-status">${statusOptions}</select>
-    </div>
-    <div class="hint">地番は筆マスタ（登記所備付地図データ）から選択します。領域・坪数は選んだ筆から自動設定されます。
-    この案件にすでに追加済みの筆は表示されません。</div>
-  `;
-
-  const saveBtn = makeBtn('作成', 'btn-primary', async () => {
-    const errEl = document.getElementById('form-error');
-    errEl.style.display = 'none';
-
-    const parcelId = document.getElementById('f-parcel').value;
-    if (!parcelId) {
-      errEl.textContent = '地番を選択してください';
-      errEl.style.display = 'block';
-      return;
-    }
-
-    const status = document.getElementById('f-status').value;
-    try {
-      await window.DataStore.createLand(state.projects, projectId, { parcelId, status });
-    } catch (e) {
-      // 筆マスタに存在しない地番・案件内での筆重複などはサーバが日本語メッセージで拒否する
-      console.error(e);
-      errEl.textContent = e.message;
-      errEl.style.display = 'block';
-      return;
-    }
-    toast('土地を追加しました（領域・坪数は筆マスタから自動設定）');
-    closeModal();
-    renderEdit();
-  });
-
-  openModal({
-    title: '土地を追加',
-    body,
-    footer: [makeBtn('キャンセル', '', closeModal), saveBtn],
-  });
-
-  // 町名の選択に応じて地番プルダウンを入れ替える（筆一覧は町名単位で遅延取得。
-  // 案件内で使用済みの筆は除外）
-  const azaEl = document.getElementById('f-aza');
-  const parcelEl = document.getElementById('f-parcel');
-  let optionsToken = 0; // 町名を連続で切り替えたとき、古い応答で上書きしないためのトークン
-  async function refreshParcelOptions() {
-    if (!parcelEl || !azaEl) return;
-    const token = ++optionsToken;
-    parcelEl.disabled = true;
-    parcelEl.innerHTML = '<option value="">読み込み中…</option>';
-    let parcels;
-    try {
-      parcels = await window.DataStore.parcelsByTown(azaEl.value);
-    } catch (e) {
-      console.error(e);
-      if (token === optionsToken && parcelEl.isConnected) {
-        parcelEl.innerHTML = '<option value="">（筆一覧の取得に失敗）</option>';
-      }
-      return;
-    }
-    if (token !== optionsToken || !parcelEl.isConnected) return;
-    const usedIds = new Set(proj.lands.map(l => l.parcelId));
-    const avail = parcels.filter(p => !usedIds.has(p.parcelId));
-    parcelEl.innerHTML = avail.length
-      ? avail.map(p => `<option value="${escHtml(p.parcelId)}">${escHtml(p.chiban)}</option>`).join('')
-      : '<option value="">（この町名の筆はすべて追加済み）</option>';
-    parcelEl.disabled = false;
-  }
-  azaEl?.addEventListener('change', refreshParcelOptions);
-  refreshParcelOptions();
-
-  setTimeout(() => { document.getElementById('f-parcel')?.focus(); }, 50);
 }
 
 async function deleteLandConfirm(projectId, landId) {

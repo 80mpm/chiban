@@ -117,8 +117,10 @@ _token_cache = TokenCache()
 def _parcels_handler(conn, m, b, q):
     town = (q.get("town") or [None])[0]
     if town:
-        # 町名単位の遅延取得（プルダウン用・属性のみ）
-        return 200, appdb.get_parcels_by_town(conn, town)
+        # 町名単位の遅延取得（プルダウン用は属性のみ。
+        # geometry=1 で領域付き — 土地の追加モードの候補筆表示用）
+        with_geometry = (q.get("geometry") or ["0"])[0] in ("1", "true")
+        return 200, appdb.get_parcels_by_town(conn, town, with_geometry)
     return 200, appdb.get_parcels(conn)
 
 

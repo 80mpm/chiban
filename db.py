@@ -456,7 +456,7 @@ def _parse_dt(value, fallback=None):
 # ============================================================
 
 def get_parcel_towns(conn):
-    """町名（地番区域）の一覧と筆数。土地追加モーダル等のプルダウン用。"""
+    """町名（地番区域）の一覧と筆数。土地の追加モード等のプルダウン用。"""
     rows = conn.execute(
         """SELECT c.name, count(*) AS n
              FROM parcels p JOIN chibankuiki c ON c.id = p.chibankuiki_id
@@ -465,15 +465,21 @@ def get_parcel_towns(conn):
     return [{"name": r["name"], "count": r["n"]} for r in rows]
 
 
-def get_parcels_by_town(conn, town):
-    """指定町名の筆一覧（属性のみ・ジオメトリなし）。
-    プルダウンの選択肢用なので parcelId と地番だけ返す。"""
+def get_parcels_by_town(conn, town, with_geometry=False):
+    """指定町名の筆一覧。プルダウンの選択肢用は属性のみ（parcelId と地番）。
+    with_geometry=True で領域 [[lat,lng]] 付き（土地の追加モードの候補筆表示用）。"""
+    cols = "p.id, p.chiban" + (", p.geometry" if with_geometry else "")
     rows = conn.execute(
-        """SELECT p.id, p.chiban
+        f"""SELECT {cols}
              FROM parcels p JOIN chibankuiki c ON c.id = p.chibankuiki_id
             WHERE c.name = %s ORDER BY p.id""",
         (town,),
     ).fetchall()
+    if with_geometry:
+        return [
+            {"parcelId": r["id"], "chiban": r["chiban"], "polygon": parcel_ring(r["geometry"])}
+            for r in rows
+        ]
     return [{"parcelId": r["id"], "chiban": r["chiban"]} for r in rows]
 
 
