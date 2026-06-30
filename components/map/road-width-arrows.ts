@@ -10,6 +10,27 @@ import type { FrontRoad, LatLng } from "@/lib/types";
 const ARROW_COLOR = "#b91c1c";
 const METER_PER_LAT = 111000;
 
+/**
+ * ポリゴンの巻き方向（反時計回りか）。x=lng, y=lat の符号付き面積で判定する。
+ * 外向き法線の向きはこの巻き方向だけで一意に決まる（凹多角形でも正しい。
+ * 重心からの方向で判定する旧方式は凹形で破綻するため使わない）。
+ */
+export function polygonWindingCCW(points: LatLng[]): boolean {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [lat1, lng1] = points[i];
+    const [lat2, lng2] = points[(i + 1) % points.length];
+    area += lng1 * lat2 - lng2 * lat1;
+  }
+  return area > 0;
+}
+
+/** 辺方向の単位ベクトル (eE,eN) に対するポリゴン外向き単位法線。 */
+export function outwardPerp(eE: number, eN: number, ccw: boolean): { perpE: number; perpN: number } {
+  // CCW: 内側は進行方向左 → 外向きは右回り (eN,-eE)。CW はその反対。
+  return ccw ? { perpE: eN, perpN: -eE } : { perpE: -eN, perpN: eE };
+}
+
 /** map に矢印・矢頭・ラベルを描く。追加した Layer 配列を返す（cleanup 用）。 */
 export function drawRoadWidthArrows(
   Lib: typeof L,
@@ -28,13 +49,7 @@ export function drawRoadWidthArrows(
       latlng.lng + dE / meterPerLng(latlng.lat),
     );
 
-  let cLat = 0;
-  let cLng = 0;
-  for (const [la, ln] of polygonPoints) {
-    cLat += la;
-    cLng += ln;
-  }
-  const centroid = Lib.latLng(cLat / polygonPoints.length, cLng / polygonPoints.length);
+  const ccw = polygonWindingCCW(polygonPoints);
 
   const makeArrowhead = (
     apex: L.LatLng,
@@ -73,16 +88,8 @@ export function drawRoadWidthArrows(
     const edgeE = dE / edgeLen;
     const edgeN = dN / edgeLen;
 
-    const p1E = -edgeN;
-    const p1N = edgeE;
-    const p2E = edgeN;
-    const p2N = -edgeE;
-
-    const outRefE = (mid.lng - centroid.lng) * meterPerLng(latAvg);
-    const outRefN = (mid.lat - centroid.lat) * METER_PER_LAT;
-    const useP1 = p1E * outRefE + p1N * outRefN > p2E * outRefE + p2N * outRefN;
-    const perpE = useP1 ? p1E : p2E;
-    const perpN = useP1 ? p1N : p2N;
+    // 外向き法線は巻き方向だけで決まる（凹形でも正しい）。
+    const { perpE, perpN } = outwardPerp(edgeE, edgeN, ccw);
 
     const start = mid;
     const end = offsetLL(start, perpE * w, perpN * w);

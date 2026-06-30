@@ -235,3 +235,46 @@ svg .north-mark {
   line-height: 1;
   pointer-events: none;
 }
+/* 領域マップの辺番号バッジ（前面道路幅員エディタと連動・クリックで選択）。
+   位置決めは Leaflet の iconSize/iconAnchor に任せ、ここでは中身を中央寄せするだけ。 */
+.edge-index-badge {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 1.5px solid #065a82;
+  color: #065a82;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  /* 字形メトリクスの上寄りを相殺して光学的中心に合わせる微調整 */
+  padding-top: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+.edge-index-badge--selected {
+  background: #065a82;
+  border-color: #065a82;
+  color: #ffffff;
+}
+/* 前面道路幅員のドラッグハンドル（選択辺の道路側に出る掴み丸）*/
+.road-width-handle {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #b91c1c;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+}
+.road-width-handle:active {
+  cursor: grabbing;
+}
+.leaflet-marker-draggable.leaflet-drag-target .road-width-handle {
+  cursor: grabbing;
+}

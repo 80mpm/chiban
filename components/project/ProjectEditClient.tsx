@@ -9,10 +9,11 @@ import { InlineTextField } from "@/components/InlineTextField";
 import { KouzuView } from "@/components/kouzu/KouzuView";
 import { StatusBar } from "@/components/project/StatusBar";
 import { LandDetailPanel } from "@/components/project/LandDetailPanel";
+import { FrontRoadEditor } from "@/components/project/FrontRoadEditor";
 import { ParcelPickerDialog } from "@/components/project/ParcelPickerDialog";
 import { useProjects, useProjectMutations } from "@/hooks/use-projects";
 import { fmtDateTime, fmtTsubo } from "@/lib/format";
-import type { Project, LatLng } from "@/lib/types";
+import type { FrontRoad, Project, LatLng } from "@/lib/types";
 
 const PolygonDrawMap = dynamic(() => import("@/components/map/PolygonDrawMap"), {
   ssr: false,
@@ -36,6 +37,7 @@ export function ProjectEditClient({
   const [selectedLandId, setSelectedLandId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
+  const [selectedEdge, setSelectedEdge] = useState<number | null>(null);
 
   if (!proj) {
     return (
@@ -91,8 +93,21 @@ export function ProjectEditClient({
     const oldCount = Array.isArray(proj!.polygon) ? proj!.polygon.length : 0;
     const newCount = Array.isArray(polygon) ? polygon.length : 0;
     // 頂点数が変わると frontRoads の辺インデックスが無効になるためクリアする
-    if (newCount !== oldCount) saveProject({ polygon, frontRoads: [] });
-    else saveProject({ polygon });
+    if (newCount !== oldCount) {
+      setSelectedEdge(null);
+      saveProject({ polygon, frontRoads: [] });
+    } else {
+      saveProject({ polygon });
+    }
+  }
+
+  // 領域マップのハンドルドラッグ確定時に、その辺の前面道路幅員を保存する。
+  // 削除は一覧のゴミ箱ボタンで行うため、ここでは幅員 0 以下は保存しない（削除もしない）。
+  function commitFrontRoadWidth(edgeIndex: number, width: number) {
+    if (!(width > 0)) return;
+    const others = (proj!.frontRoads ?? []).filter((r) => r.edgeIndex !== edgeIndex);
+    const next = [...others, { edgeIndex, width }].sort((a, b) => a.edgeIndex - b.edgeIndex);
+    saveProject({ frontRoads: next });
   }
 
   function deleteProjectConfirm() {
@@ -131,7 +146,7 @@ export function ProjectEditClient({
   const fieldLabel = "text-sm text-muted-foreground";
 
   return (
-    <main className="mx-auto max-w-6xl space-y-4 overflow-y-auto p-6">
+    <main className="mx-auto h-full max-w-6xl space-y-4 overflow-y-auto p-6">
       {/* パンくず + タイトル */}
       <div>
         <div className="text-xs text-muted-foreground">
@@ -149,7 +164,24 @@ export function ProjectEditClient({
       {/* 上段 2 カラム: 領域マップ / 案件情報 */}
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
-          <PolygonDrawMap initialPolygon={proj.polygon} onChange={handlePolygonChange} />
+          <PolygonDrawMap
+            initialPolygon={proj.polygon}
+            onChange={handlePolygonChange}
+            frontRoads={proj.frontRoads}
+            selectedEdge={selectedEdge}
+            onSelectEdge={setSelectedEdge}
+            onCommitWidth={commitFrontRoadWidth}
+          />
+          <div className="mt-3 border-t border-border pt-3">
+            <h4 className="mb-2 text-sm font-semibold text-[color:var(--app-text-dark)]">前面道路の幅員</h4>
+            <FrontRoadEditor
+              polygon={proj.polygon}
+              frontRoads={proj.frontRoads}
+              selectedEdge={selectedEdge}
+              onSelectEdge={setSelectedEdge}
+              onChange={(frontRoads: FrontRoad[]) => saveProject({ frontRoads })}
+            />
+          </div>
         </div>
 
         <div className="rounded-lg border border-border bg-white p-4 shadow-sm">

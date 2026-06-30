@@ -255,7 +255,8 @@ Node ランタイムが必要なため、該当 Route Handler は `runtime = 'no
 
 **① 辺の長さ（derived・保存しない）**
 - 領域ポリゴンの頂点（緯度経度）から毎回算出する各辺の実長。どこにも永続化しない
-- 算出・描画は `components/map/ProjectAreaMap.tsx`（Leaflet の `distanceTo()` → `.edge-length-label`）
+- 算出・描画は `components/map/ProjectAreaMap.tsx`（Leaflet の `distanceTo()` → `.edge-length-label`）。
+  編集画面の一覧は `components/project/FrontRoadEditor.tsx` が同等の haversine で算出
 - 編集手段は値の直接入力ではなく、**案件編集画面の「領域マップ」で頂点をドラッグして形を変える**間接編集のみ（`components/map/PolygonDrawMap.tsx`、Leaflet.draw）
 
 **② 前面道路の幅員（`Project.frontRoads`・ユーザーデータ）**
@@ -265,11 +266,22 @@ Node ランタイムが必要なため、該当 Route Handler は `runtime = 'no
   （`sql.json` で書き込み）/ `lib/queries/serialize.ts`（読み出しは転写のみ・導出なし）
 - 更新 API: `PATCH /api/projects/:id` に `frontRoads: [{edgeIndex, width}, …]` を渡す
 - 矢印・ラベル描画: `components/map/road-width-arrows.ts`（中点から幅員ぶん外向きに矢印、`${w.toFixed(1)} m`）
-- **編集 UI は未実装（意図的）**。DB・API・表示は揃っているが、ユーザーが画面で各辺の幅員を
-  入力する手段はなく、値は**サンプルデータ投入時にのみ設定**される（`lib/db/sample.ts` に
-  `{ edgeIndex: 0, width: 6 }` 等をハードコード）。変更は API 直叩きか DB 直編集による
+- **編集 UI**: 案件編集画面で、①辺番号バッジ／一覧で辺を選択 → ②領域マップに出る赤いハンドルを
+  ドラッグして幅員を設定（0.1m 丸め）、または ③一覧（`FrontRoadEditor`）の数値入力で微調整。
+  一覧には**設定済みの辺のみ**を表示し、各行の**ゴミ箱ボタンで削除**する（0/空は削除に使わない）
 - `edgeIndex` は頂点数に依存するため、**頂点数が変わると frontRoads はクリアする**
   （`components/project/ProjectEditClient.tsx` の `handlePolygonChange`）
+
+### 距離・幅員の計算方式の決定（重要・方針）
+
+- **辺長・幅員ともに ZENRIN API（`ca_distance` 等）は使わず、オフラインの自前計算で行う**。
+  理由: 検証の結果、ZENRIN `ca_distance` と自前 haversine の差は数 cm（短辺で 0.01〜0.04m）に過ぎず、
+  自前計算なら **PV 課金なし・オフライン可・低遅延**で実用上同等。よってアプリ内の距離計算は自前で統一する
+- **辺長**: 2 点間 haversine（`ProjectAreaMap.tsx` は Leaflet `distanceTo`、`FrontRoadEditor.tsx` は同等式）
+- **幅員（ドラッグ）**: ハンドルのドラッグ位置を**辺の外向き単位法線へ射影した長さ**を幅員とする
+  （`PolygonDrawMap.tsx` の `edgeNormal`。メートル⇄緯度経度は緯度補正付き平面近似
+  `METER_PER_LAT=111000` / `111000·cosφ`）。斜めにドラッグしても道路方向の幅として扱える
+- 将来 ZENRIN の幾何計算が必要になった場合に備え、距離計算は局所関数に閉じておく（API 依存を作らない）
 
 ## データ構造
 
