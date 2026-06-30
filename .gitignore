@@ -1,6 +1,9 @@
 HANDOFF.md
 .env
 .env*.local
+.env.old
+# ZENRIN 設定完了通知書（ユーザーID/パスワード等の資格情報を含むためコミットしない）
+zenrin.pdf
 
 # Next.js / Node
 node_modules/
