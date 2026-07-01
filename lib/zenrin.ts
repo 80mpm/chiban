@@ -23,16 +23,25 @@ const ZENRIN_WMTS_DOMAIN = process.env.ZENRIN_WMTS_DOMAIN ?? "test-wmts.zip-site
 // 強制タイムアウトより手前で能動的に張り直す（既定 25 分）。
 const ZENRIN_SESSION_TTL_SEC = Number(process.env.ZENRIN_SESSION_TTL_SEC ?? "1500");
 
-// wmts_tile［画像出力(WMTS)GetTile(REST方式)］の機能コード（機能コード一覧より）。
-const WMTS_TILE_FUNC_ID = "0007";
+// 機能コード（機能コード一覧より）。
+const WMTS_TILE_FUNC_ID = "0007"; // 画像出力(WMTS)GetTile(REST方式)
 const WMTS_TILE_FUNC_SUBID = "0008";
+const YOUTO_FUNC_ID = "0003"; // データ重畳[用途地域] wms/youto
+const YOUTO_FUNC_SUBID = "0002";
 
 const LOGIN_OK = "10100000";
+
+interface LoginFunc {
+  id: string;
+  subid: string;
+  areaCode: string;
+  funcInfo: string;
+}
 
 interface SessionState {
   aid: string; // 認証承認ID
   kid: string; // 基盤認証ID
-  lmtinf: string; // wmts_tile の "areaCode,funcInfo"
+  funcs: LoginFunc[]; // 機能ごとの areaCode/funcInfo（lmtinf の素）
   expiresAt: number; // epoch ms（この時刻を過ぎたら再ログイン）
 }
 
@@ -41,11 +50,10 @@ const globalForZenrin = globalThis as unknown as {
   __zenrinLoginInflight?: Promise<SessionState>;
 };
 
-interface LoginFunc {
-  id: string;
-  subid: string;
-  areaCode: string;
-  funcInfo: string;
+/** 指定機能の zis_lmtinf（"areaCode,funcInfo"）を組み立てる。未契約なら null。 */
+function lmtinfFor(session: SessionState, id: string, subid: string): string | null {
+  const f = session.funcs.find((x) => x.id === id && x.subid === subid);
+  return f ? `${f.areaCode},${f.funcInfo}` : null;
 }
 
 /** ユーザーID/パスワードで認証サーバにログインし、aid/kid/lmtinf を得る。 */
@@ -83,13 +91,11 @@ async function login(): Promise<SessionState> {
   }
   const aid = json.result?.aid;
   const kid = json.result?.kid;
-  const func = json.result?.items?.func?.find(
-    (f) => f.id === WMTS_TILE_FUNC_ID && f.subid === WMTS_TILE_FUNC_SUBID,
-  );
+  const funcs = json.result?.items?.func ?? [];
   if (!aid || !kid) {
     throw new Error("ZENRIN ログイン応答に aid / kid が含まれていません");
   }
-  if (!func) {
+  if (!funcs.some((f) => f.id === WMTS_TILE_FUNC_ID && f.subid === WMTS_TILE_FUNC_SUBID)) {
     throw new Error(
       "ZENRIN ログイン応答に wmts_tile（機能コード 0007/0008）の機能情報が含まれていません。契約内容をご確認ください",
     );
@@ -97,7 +103,7 @@ async function login(): Promise<SessionState> {
   return {
     aid,
     kid,
-    lmtinf: `${func.areaCode},${func.funcInfo}`,
+    funcs,
     expiresAt: Date.now() + Math.max(60, ZENRIN_SESSION_TTL_SEC) * 1000,
   };
 }
@@ -116,7 +122,9 @@ async function logout(aid: string): Promise<void> {
 /** セッションを期限内キャッシュする。同時リクエストでは 1 回のログインに集約する。 */
 async function getSession(): Promise<SessionState> {
   const cached = globalForZenrin.__zenrinSession;
-  if (cached && Date.now() < cached.expiresAt) return cached;
+  // 期限内かつ機能情報を持つ（＝新しい形の）セッションのみ再利用する。
+  // 旧デプロイ/ホットリロード由来の古い形は無効扱いにして張り直す。
+  if (cached && Date.now() < cached.expiresAt && Array.isArray(cached.funcs)) return cached;
 
   if (!globalForZenrin.__zenrinLoginInflight) {
     const prevAid = cached?.aid;
@@ -148,7 +156,7 @@ async function requestTile(
   url.searchParams.set("zis_zips_authkey", session.kid);
   url.searchParams.set("zis_authtype", "aid");
   url.searchParams.set("zis_aid", session.aid);
-  url.searchParams.set("zis_lmtinf", session.lmtinf);
+  url.searchParams.set("zis_lmtinf", lmtinfFor(session, WMTS_TILE_FUNC_ID, WMTS_TILE_FUNC_SUBID) ?? "");
   return fetch(url, { method: "GET" });
 }
 
@@ -164,6 +172,85 @@ export async function fetchTile(z: string, x: string, y: string): Promise<Respon
     globalForZenrin.__zenrinSession = undefined;
     session = await getSession();
     res = await requestTile(session, z, x, y);
+  }
+  if (!res.ok) {
+    return new Response(`Upstream ${res.status}`, { status: res.status });
+  }
+  const buf = await res.arrayBuffer();
+  return new Response(buf, {
+    status: 200,
+    headers: {
+      "Content-Type": res.headers.get("Content-Type") ?? "image/png",
+      "Cache-Control": "public, max-age=86400",
+    },
+  });
+}
+
+// WMS プロキシで引き継ぐパラメータ（Leaflet の L.tileLayer.wms が生成する WMS 標準パラメータ）。
+const WMS_PASSTHROUGH = [
+  "SERVICE",
+  "REQUEST",
+  "VERSION",
+  "LAYERS",
+  "LAYER", // GetLegendGraphic は単数 LAYER
+  "STYLES",
+  "STYLE",
+  "SLD_VERSION",
+  "SCALE",
+  "FORMAT",
+  "TRANSPARENT",
+  "WIDTH",
+  "HEIGHT",
+  "CRS",
+  "SRS",
+  "BBOX",
+  // GetFeatureInfo 用
+  "QUERY_LAYERS",
+  "INFO_FORMAT",
+  "FEATURE_COUNT",
+  "I",
+  "J",
+  "X",
+  "Y",
+];
+
+/**
+ * ZENRIN データ重畳［用途地域］(wms/youto) の WMS GetMap をプロキシする。
+ * クライアント（Leaflet）が送る WMS パラメータを引き継ぎ、ログイン認証の zis_* を付与して中継する。
+ * 認証エラー（401/403）時はセッションを破棄して 1 度だけ再ログインし、リトライする。
+ */
+export async function fetchYoutoWms(params: URLSearchParams): Promise<Response> {
+  const build = (session: SessionState): URL | null => {
+    const lmtinf = lmtinfFor(session, YOUTO_FUNC_ID, YOUTO_FUNC_SUBID);
+    if (lmtinf == null) return null;
+    const url = new URL(`https://${ZENRIN_LOGIN_DOMAIN}/api/zips/general/wms/youto`);
+    // WMS 標準パラメータを大文字キーで引き継ぐ（キーの大小差異を吸収）。
+    const upper = new Map<string, string>();
+    params.forEach((v, k) => upper.set(k.toUpperCase(), v));
+    for (const key of WMS_PASSTHROUGH) {
+      const v = upper.get(key);
+      if (v != null) url.searchParams.set(key, v);
+    }
+    url.searchParams.set("zis_zips_authkey", session.kid);
+    url.searchParams.set("zis_authtype", "aid");
+    url.searchParams.set("zis_aid", session.aid);
+    url.searchParams.set("zis_lmtinf", lmtinf);
+    return url;
+  };
+
+  let session = await getSession();
+  let url = build(session);
+  if (!url) {
+    throw new Error(
+      "用途地域（機能コード 0003/0002）が契約に含まれていません。営業担当にご確認ください",
+    );
+  }
+  let res = await fetch(url, { method: "GET" });
+  if (res.status === 401 || res.status === 403) {
+    globalForZenrin.__zenrinSession = undefined;
+    session = await getSession();
+    url = build(session);
+    if (url) res = await fetch(url, { method: "GET" });
   }
   if (!res.ok) {
     return new Response(`Upstream ${res.status}`, { status: res.status });
