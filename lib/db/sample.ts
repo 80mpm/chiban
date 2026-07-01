@@ -8,8 +8,13 @@ import type { Sql, TransactionSql } from "postgres";
 import { sql } from "./client";
 import { uuid } from "./ids";
 import { parcelRing, polygonAreaTsubo, convexHull, type GeoJsonPolygon } from "../geo";
-import { replaceOwners } from "../queries/owners";
-import type { LatLng, Owner, LandStatus } from "../types";
+import {
+  parseShare,
+  replaceOwners,
+  replaceBuildingOwners,
+  replaceUnitOwners,
+} from "../queries/owners";
+import type { LatLng, Owner, LandStatus, BuildingOwnershipType } from "../types";
 
 type SqlLike = Sql | TransactionSql;
 
@@ -82,6 +87,24 @@ function visit(
   return { user, comment, date, directOrTel, meetingType, nextDate, progress, principal };
 }
 
+interface SampleUnit {
+  unitNumber: string;
+  owners: Owner[];
+  siteShare?: string;
+  description?: string;
+}
+
+interface SampleBuilding {
+  name?: string;
+  houseNumber?: string;
+  structure?: string;
+  floorAreaTsubo?: number;
+  ownershipType: BuildingOwnershipType;
+  owners?: Owner[];
+  units?: SampleUnit[];
+  description?: string;
+}
+
 interface SampleLand {
   parcelId: number;
   owners: Owner[];
@@ -91,6 +114,7 @@ interface SampleLand {
   createdAt: Date;
   updatedAt: Date;
   visits: SampleVisit[];
+  buildings?: SampleBuilding[];
   _ring: LatLng[];
 }
 
@@ -194,6 +218,16 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
         status: "acquired",
         createdAt: t(8),
         updatedAt: t(3),
+        buildings: [
+          {
+            houseNumber: "24番3",
+            structure: "木造瓦葺2階建",
+            floorAreaTsubo: 28,
+            ownershipType: "sole",
+            owners: [{ name: "安野政子", share: "" }],
+            description: "土地と同一名義の居宅。土地とあわせて取得済み（解体予定）",
+          },
+        ],
         visits: [
           visit("木村", "初回訪問。安野様にご挨拶し、再開発計画の概要を説明。本人は売却に前向き。", t(8), "直", "面談(対面)", t(5), "B", "principal"),
           visit("木村", "条件合意。売買契約締結・所有権移転登記完了。", t(3), "直", "面談(対面)", null, "初期見込み", "principal"),
@@ -209,6 +243,16 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
         status: "acquired",
         createdAt: t(6),
         updatedAt: t(6),
+        buildings: [
+          {
+            houseNumber: "23番1",
+            structure: "木造スレート葺2階建",
+            floorAreaTsubo: 22,
+            ownershipType: "sole",
+            owners: [{ name: "中嶋直美", share: "" }],
+            description: "土地は共有名義だが建物は中嶋直美氏の単独名義。建物もあわせて取得済み",
+          },
+        ],
         visits: [
           visit("木村", "持分の多い中嶋直美氏が窓口となり、共有者全員から押印取得。所有権移転登記完了。", t(6), "直", "面談(対面)", null, "初期見込み", "principal"),
         ],
@@ -230,6 +274,17 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
         status: "target",
         createdAt: t(4),
         updatedAt: t(1),
+        buildings: [
+          {
+            name: "メイクス浅草ビル",
+            houseNumber: "24番5",
+            structure: "鉄骨造陸屋根4階建",
+            floorAreaTsubo: 95,
+            ownershipType: "sole",
+            owners: [{ name: "株式会社メイクス", share: "" }],
+            description: "土地と同一名義の自社ビル。土地・建物一括での売買を打診中",
+          },
+        ],
         visits: [
           visit("本田", "初回訪問。代表に再開発の趣旨を説明、社内検討のため資料を持ち帰り。", t(4), "直", "面談(対面)", t(2), "初期見込み", "principal"),
           visit("木村", "代表より社内決裁待ちとの回答。次回は最終条件を提示予定。", t(1), "TEL", "面談(ITP)", tAt(-2, 15, 30), "B", "non_principal"),
@@ -276,6 +331,60 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
       updatedAt: t(3),
       visits: [
         visit("佐藤", "地権者と条件合意。売買契約締結・所有権移転登記完了。", t(3), "直", "面談(対面)", null, "初期見込み", "principal"),
+      ],
+    },
+    // 区分所有マンションの例。土地の地権者は敷地権（土地の共有持分）を持つ
+    // 区分所有者全員で、持分は各専有部分の敷地権割合と一致させている
+    1: {
+      owners: [
+        { name: "森田一郎", share: "2820/11280" },
+        { name: "池田梅子", share: "2820/11280" },
+        { name: "斎藤勝", share: "1410/11280" },
+        { name: "斎藤朋子", share: "1410/11280" },
+        { name: "清水トミ", share: "2820/11280" },
+      ],
+      description:
+        "敷地権付き区分所有マンション。全4戸の区分所有者それぞれと個別交渉が必要",
+      buildings: [
+        {
+          name: "上野パークハイツ",
+          houseNumber: "141番2",
+          structure: "鉄筋コンクリート造陸屋根5階建",
+          floorAreaTsubo: 180,
+          ownershipType: "kubun",
+          units: [
+            {
+              unitNumber: "101",
+              owners: [{ name: "森田一郎", share: "" }],
+              siteShare: "2820/11280",
+              description: "1階店舗。オーナーが自営",
+            },
+            {
+              unitNumber: "201",
+              owners: [{ name: "池田梅子", share: "" }],
+              siteShare: "2820/11280",
+            },
+            {
+              unitNumber: "202",
+              owners: [
+                { name: "斎藤勝", share: "1/2" },
+                { name: "斎藤朋子", share: "1/2" },
+              ],
+              siteShare: "2820/11280",
+              description: "夫婦共有名義",
+            },
+            {
+              unitNumber: "301",
+              owners: [{ name: "清水トミ", share: "" }],
+              siteShare: "2820/11280",
+              description: "所有者は施設入居中。長男が窓口",
+            },
+          ],
+          description: "1983年築。管理組合はあるが管理会社への委託なし",
+        },
+      ],
+      visits: [
+        visit("佐藤", "管理組合の理事長（森田氏）に接触。区分所有者の名簿と連絡先を確認中。", t(2), "直", "面談(対面)", t(-4), "C", "principal"),
       ],
     },
     2: {
@@ -347,6 +456,28 @@ export async function insertSamples(db: SqlLike): Promise<void> {
                 ${land.areaTsubo}, ${land.status}, ${land.createdAt}, ${land.updatedAt})
       `;
       await replaceOwners(db, landId, land.owners);
+      for (const b of land.buildings ?? []) {
+        const buildingId = uuid();
+        await db`
+          INSERT INTO buildings (id, land_id, name, house_number, structure,
+                                 floor_area_tsubo, ownership_type, description,
+                                 created_at, updated_at)
+          VALUES (${buildingId}, ${landId}, ${b.name ?? ""}, ${b.houseNumber ?? ""},
+                  ${b.structure ?? ""}, ${b.floorAreaTsubo ?? null}, ${b.ownershipType},
+                  ${b.description ?? ""}, ${land.createdAt}, ${land.updatedAt})
+        `;
+        await replaceBuildingOwners(db, buildingId, b.owners ?? []);
+        for (const u of b.units ?? []) {
+          const [num, den] = parseShare(u.siteShare);
+          const [unit] = await db<{ id: number }[]>`
+            INSERT INTO building_units (building_id, unit_number, site_share_num,
+                                        site_share_den, description)
+            VALUES (${buildingId}, ${u.unitNumber}, ${num}, ${den}, ${u.description ?? ""})
+            RETURNING id
+          `;
+          await replaceUnitOwners(db, unit.id, u.owners);
+        }
+      }
       for (const v of land.visits) {
         await db`
           INSERT INTO visits (id, land_id, user_name, comment, date,
@@ -364,10 +495,13 @@ export async function insertSamples(db: SqlLike): Promise<void> {
   `;
 }
 
-/** 案件・土地・訪問記録を破棄してサンプルを再投入する（筆マスタは残す）。 */
+/** 案件・土地・建物・訪問記録を破棄してサンプルを再投入する（筆マスタは残す）。 */
 export async function resetSamples(): Promise<void> {
   await sql.begin(async (tx) => {
-    await tx`TRUNCATE visits, land_owners, lands, projects RESTART IDENTITY CASCADE`;
+    await tx`
+      TRUNCATE visits, building_unit_owners, building_units, building_owners,
+               buildings, land_owners, lands, projects RESTART IDENTITY CASCADE
+    `;
     await insertSamples(tx);
     await tx`
       INSERT INTO app_meta (key, value) VALUES ('seeded', '1')

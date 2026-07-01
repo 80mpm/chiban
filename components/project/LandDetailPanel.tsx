@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { InlineTextField } from "@/components/InlineTextField";
+import { BuildingSection } from "@/components/project/BuildingSection";
 import { ParcelPickerDialog } from "@/components/project/ParcelPickerDialog";
 import { useProjectMutations } from "@/hooks/use-projects";
 import { STATUS_DEFS, STATUS_KEYS, formatOwners, parseOwners, fmtDateTime, fmtDateOnly, fmtTsubo } from "@/lib/format";
@@ -124,6 +125,8 @@ export function LandDetailPanel({
         <label className={labelCls}>更新日</label>
         <div className="text-sm">{dash(fmtDateTime(land.updatedAt ?? land.createdAt))}</div>
       </div>
+
+      <BuildingSection proj={proj} land={land} />
 
       <h4 className="mb-1.5 mt-3.5 text-[11px] font-semibold uppercase tracking-wide text-[#475569]">
         訪問記録 ({visits.length})

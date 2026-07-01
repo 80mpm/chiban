@@ -7,15 +7,18 @@ import { sql } from "../db/client";
 import { ensureDbReady } from "../db/init";
 import { ApiError } from "../api-error";
 import { parseProjectId } from "./helpers";
+import { BUILDING_SELECT } from "./buildings";
 import {
+  buildingJson,
   landJson,
   projectJson,
   visitJson,
+  type BuildingRow,
   type LandRow,
   type ProjectRow,
   type VisitRow,
 } from "./serialize";
-import type { Project, Visit, Land } from "../types";
+import type { Building, Project, Visit, Land } from "../types";
 
 /**
  * lands × parcels × chibankuiki を JOIN し、owners を land_owners から
@@ -38,13 +41,16 @@ export const LAND_SELECT = `
       JOIN chibankuiki c ON c.id = p.chibankuiki_id
 `;
 
-/** 全案件を lands・visits 込みのツリーで返す（3 クエリで組み立て）。 */
+/** 全案件を lands・buildings・visits 込みのツリーで返す（4 クエリで組み立て）。 */
 export async function getProjectsTree(): Promise<Project[]> {
   await ensureDbReady();
 
   const projRows = await sql<ProjectRow[]>`SELECT * FROM projects ORDER BY id`;
   const landRows = await sql.unsafe<LandRow[]>(
     LAND_SELECT + " ORDER BY l.project_id, l.created_at, l.id",
+  );
+  const buildingRows = await sql.unsafe<BuildingRow[]>(
+    BUILDING_SELECT + " ORDER BY b.land_id, b.created_at, b.id",
   );
   const visitRows = await sql<VisitRow[]>`
     SELECT * FROM visits ORDER BY land_id, date, id
@@ -57,10 +63,18 @@ export async function getProjectsTree(): Promise<Project[]> {
     visitsByLand.get(landId)!.push(visitJson(v));
   }
 
+  const buildingsByLand = new Map<string, Building[]>();
+  for (const b of buildingRows) {
+    if (!buildingsByLand.has(b.land_id)) buildingsByLand.set(b.land_id, []);
+    buildingsByLand.get(b.land_id)!.push(buildingJson(b));
+  }
+
   const landsByProj = new Map<number, Land[]>();
   for (const l of landRows) {
     if (!landsByProj.has(l.project_id)) landsByProj.set(l.project_id, []);
-    landsByProj.get(l.project_id)!.push(landJson(l, visitsByLand.get(l.id) ?? []));
+    landsByProj
+      .get(l.project_id)!
+      .push(landJson(l, visitsByLand.get(l.id) ?? [], buildingsByLand.get(l.id) ?? []));
   }
 
   return projRows.map((p) => projectJson(p, landsByProj.get(p.id) ?? []));

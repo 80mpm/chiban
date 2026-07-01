@@ -3,7 +3,7 @@
 // クライアント・サーバ双方から使える純関数。
 // ============================================================
 
-import type { Owner, LandStatus } from "./types";
+import type { Owner, LandStatus, BuildingOwnershipType } from "./types";
 
 /** ステータス定義（label / color）。 */
 export const STATUS_DEFS: Record<LandStatus, { label: string; color: string }> = {
@@ -12,6 +12,14 @@ export const STATUS_DEFS: Record<LandStatus, { label: string; color: string }> =
 };
 
 export const STATUS_KEYS: LandStatus[] = ["target", "acquired"];
+
+/** 建物の所有形態定義（label / color）。 */
+export const OWNERSHIP_TYPE_DEFS: Record<BuildingOwnershipType, { label: string; color: string }> = {
+  sole: { label: "一棟所有", color: "#64748b" },
+  kubun: { label: "区分所有", color: "#8b5cf6" },
+};
+
+export const OWNERSHIP_TYPE_KEYS: BuildingOwnershipType[] = ["sole", "kubun"];
 
 /**
  * owners 配列を表示用文字列に整形する。

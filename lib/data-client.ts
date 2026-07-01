@@ -9,6 +9,9 @@
 import type {
   Project,
   Land,
+  Building,
+  BuildingOwnershipType,
+  BuildingUnit,
   Visit,
   Owner,
   ParcelTown,
@@ -89,6 +92,55 @@ export const deleteLand = (projectId: string, landId: string) =>
   api<null>(
     "DELETE",
     `/api/projects/${encodeURIComponent(projectId)}/lands/${encodeURIComponent(landId)}`,
+  );
+
+// ----- 建物 CRUD -----
+/** 専有部分の送信形（id はサーバ採番なので送らない）。 */
+export type BuildingUnitInput = Omit<BuildingUnit, "id">;
+
+/** 建物の送信形（owners / units は渡したときのみ全置換）。 */
+export interface BuildingInput {
+  name?: string;
+  houseNumber?: string;
+  structure?: string;
+  floorAreaTsubo?: number | null;
+  ownershipType?: BuildingOwnershipType;
+  owners?: Owner[];
+  units?: BuildingUnitInput[];
+  description?: string;
+}
+
+export const createBuilding = (
+  projectId: string,
+  landId: string,
+  fields: BuildingInput,
+) =>
+  api<Building>(
+    "POST",
+    `/api/projects/${encodeURIComponent(projectId)}/lands/${encodeURIComponent(landId)}/buildings`,
+    fields,
+  );
+
+export const updateBuilding = (
+  projectId: string,
+  landId: string,
+  buildingId: string,
+  fields: BuildingInput,
+) =>
+  api<Building>(
+    "PATCH",
+    `/api/projects/${encodeURIComponent(projectId)}/lands/${encodeURIComponent(landId)}/buildings/${encodeURIComponent(buildingId)}`,
+    fields,
+  );
+
+export const deleteBuilding = (
+  projectId: string,
+  landId: string,
+  buildingId: string,
+) =>
+  api<null>(
+    "DELETE",
+    `/api/projects/${encodeURIComponent(projectId)}/lands/${encodeURIComponent(landId)}/buildings/${encodeURIComponent(buildingId)}`,
   );
 
 // ----- 訪問記録 -----

@@ -87,7 +87,7 @@ export async function createLand(
     await replaceOwners(tx, landId, fields.owners);
     await tx`UPDATE projects SET updated_at = now() WHERE id = ${pid}`;
     const row = await fetchLandJoined(tx, pid, landId);
-    return landJson(row, []);
+    return landJson(row, [], []);
   });
 }
 
@@ -154,7 +154,7 @@ export async function updateLand(
       throw e;
     }
     const row = await fetchLandJoined(tx, pid, landId);
-    return landJson(row); // visits はクライアント側で保持
+    return landJson(row); // visits・buildings はクライアント側で保持
   });
 }
 

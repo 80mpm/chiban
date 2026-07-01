@@ -7,7 +7,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import * as api from "@/lib/data-client";
-import type { Project, Land, Visit } from "@/lib/types";
+import type { Project, Land, Building, Visit } from "@/lib/types";
 
 export const PROJECTS_KEY = ["projects"] as const;
 
@@ -37,6 +37,16 @@ const mapProjectLands = (
 ) =>
   projects.map((p) =>
     p.id === projectId ? { ...p, lands: fn(p.lands ?? []) } : p,
+  );
+
+const mapLandBuildings = (
+  projects: Project[],
+  projectId: string,
+  landId: string,
+  fn: (buildings: Building[]) => Building[],
+) =>
+  mapProjectLands(projects, projectId, (ls) =>
+    ls.map((l) => (l.id === landId ? { ...l, buildings: fn(l.buildings ?? []) } : l)),
   );
 
 /**
@@ -87,7 +97,11 @@ export function useProjectMutations() {
     onSuccess: (land, { projectId }) =>
       patch(qc, (ps) =>
         mapProjectLands(ps, projectId, (ls) =>
-          ls.map((l) => (l.id === land.id ? { ...l, ...land, visits: l.visits } : l)),
+          ls.map((l) =>
+            l.id === land.id
+              ? { ...l, ...land, visits: l.visits, buildings: l.buildings }
+              : l,
+          ),
         ),
       ),
   });
@@ -98,6 +112,60 @@ export function useProjectMutations() {
     onSuccess: (_r, { projectId, landId }) =>
       patch(qc, (ps) =>
         mapProjectLands(ps, projectId, (ls) => ls.filter((l) => l.id !== landId)),
+      ),
+  });
+
+  const createBuilding = useMutation({
+    mutationFn: ({
+      projectId,
+      landId,
+      fields,
+    }: {
+      projectId: string;
+      landId: string;
+      fields: api.BuildingInput;
+    }) => api.createBuilding(projectId, landId, fields),
+    onSuccess: (building, { projectId, landId }) =>
+      patch(qc, (ps) =>
+        mapLandBuildings(ps, projectId, landId, (bs) => [...bs, building]),
+      ),
+  });
+
+  const updateBuilding = useMutation({
+    mutationFn: ({
+      projectId,
+      landId,
+      buildingId,
+      fields,
+    }: {
+      projectId: string;
+      landId: string;
+      buildingId: string;
+      fields: api.BuildingInput;
+    }) => api.updateBuilding(projectId, landId, buildingId, fields),
+    onSuccess: (building, { projectId, landId }) =>
+      patch(qc, (ps) =>
+        mapLandBuildings(ps, projectId, landId, (bs) =>
+          bs.map((b) => (b.id === building.id ? building : b)),
+        ),
+      ),
+  });
+
+  const deleteBuilding = useMutation({
+    mutationFn: ({
+      projectId,
+      landId,
+      buildingId,
+    }: {
+      projectId: string;
+      landId: string;
+      buildingId: string;
+    }) => api.deleteBuilding(projectId, landId, buildingId),
+    onSuccess: (_r, { projectId, landId, buildingId }) =>
+      patch(qc, (ps) =>
+        mapLandBuildings(ps, projectId, landId, (bs) =>
+          bs.filter((b) => b.id !== buildingId),
+        ),
       ),
   });
 
@@ -134,6 +202,9 @@ export function useProjectMutations() {
     createLand,
     updateLand,
     deleteLand,
+    createBuilding,
+    updateBuilding,
+    deleteBuilding,
     addVisit,
   };
 }

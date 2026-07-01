@@ -5,8 +5,15 @@ import dynamic from "next/dynamic";
 import { KouzuView } from "@/components/kouzu/KouzuView";
 import { VisitAddForm } from "@/components/project/VisitAddForm";
 import { useProjects } from "@/hooks/use-projects";
-import { STATUS_DEFS, formatOwners, fmtDateTime, fmtDateOnly, fmtTsubo } from "@/lib/format";
-import type { Project, Visit } from "@/lib/types";
+import {
+  STATUS_DEFS,
+  OWNERSHIP_TYPE_DEFS,
+  formatOwners,
+  fmtDateTime,
+  fmtDateOnly,
+  fmtTsubo,
+} from "@/lib/format";
+import type { Project, Visit, Building } from "@/lib/types";
 
 const ProjectAreaMap = dynamic(() => import("@/components/map/ProjectAreaMap"), {
   ssr: false,
@@ -19,6 +26,73 @@ const PRINCIPAL_LABELS: Record<string, string> = {
   other: "その他",
 };
 const dash = (s: string) => s || "—";
+
+/** 建物 1 棟の読み取り表示（案件詳細の土地パネル用）。 */
+function BuildingItem({ b }: { b: Building }) {
+  const def = OWNERSHIP_TYPE_DEFS[b.ownershipType] ?? OWNERSHIP_TYPE_DEFS.sole;
+  const title =
+    b.name || (b.houseNumber ? `家屋番号 ${b.houseNumber}` : "名称未設定");
+  return (
+    <div className="mb-1.5 rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[12px] font-semibold text-[#1e293b]">{title}</span>
+        <span
+          className="inline-block rounded-lg px-2 py-0.5 text-[10px] font-medium text-white"
+          style={{ background: def.color }}
+        >
+          {def.label}
+        </span>
+      </div>
+      <div className="mt-1 grid grid-cols-[80px_1fr] gap-x-2.5 gap-y-1">
+        {b.structure && (
+          <>
+            <div className="text-[11px] text-[#64748b]">構造</div>
+            <div>{b.structure}</div>
+          </>
+        )}
+        {b.floorAreaTsubo != null && (
+          <>
+            <div className="text-[11px] text-[#64748b]">延床</div>
+            <div>{fmtTsubo(b.floorAreaTsubo)} 坪</div>
+          </>
+        )}
+        {b.ownershipType === "sole" ? (
+          <>
+            <div className="text-[11px] text-[#64748b]">所有者</div>
+            <div>{formatOwners(b.owners) || "—"}</div>
+          </>
+        ) : (
+          <>
+            <div className="text-[11px] text-[#64748b]">専有部分</div>
+            <div>
+              {b.units.length === 0
+                ? "—"
+                : b.units.map((u) => (
+                    <div key={u.id} className="mb-0.5">
+                      <span className="mr-1 rounded bg-[#e2e8f0] px-1.5 py-px text-[10px] font-semibold text-[#334155]">
+                        {u.unitNumber}
+                      </span>
+                      {formatOwners(u.owners) || "—"}
+                      {u.siteShare && (
+                        <span className="ml-1 text-[10px] text-[#64748b]">
+                          敷地権 {u.siteShare}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+            </div>
+          </>
+        )}
+        {b.description && (
+          <>
+            <div className="text-[11px] text-[#64748b]">備考</div>
+            <div>{b.description}</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function VisitItem({ v }: { v: Visit }) {
   const item = (k: string, val: string) =>
@@ -121,6 +195,17 @@ export function ProjectDetailClient({
               <div className="text-[11px] text-[#64748b]">更新日</div>
               <div>{dash(fmtDateTime(selectedLand.updatedAt ?? selectedLand.createdAt))}</div>
             </div>
+
+            {(selectedLand.buildings ?? []).length > 0 && (
+              <>
+                <h5 className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
+                  建物（{(selectedLand.buildings ?? []).length}棟）
+                </h5>
+                {(selectedLand.buildings ?? []).map((b) => (
+                  <BuildingItem key={b.id} b={b} />
+                ))}
+              </>
+            )}
 
             <h5 className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
               訪問記録（{(selectedLand.visits ?? []).length}件）

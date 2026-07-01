@@ -4,7 +4,16 @@
 // ============================================================
 
 import { parcelRing, type GeoJsonPolygon } from "../geo";
-import type { Land, Project, Visit, FrontRoad, Owner, LatLng } from "../types";
+import type {
+  Building,
+  BuildingUnit,
+  Land,
+  Project,
+  Visit,
+  FrontRoad,
+  Owner,
+  LatLng,
+} from "../types";
 
 /**
  * numeric → JSON 数値。postgres.js は numeric を文字列で返すため数値化する。
@@ -48,6 +57,38 @@ export function visitJson(row: VisitRow): Visit {
   };
 }
 
+/** BUILDING_SELECT が返す行（buildings + owners/units の jsonb 集約）。 */
+export interface BuildingRow {
+  id: string;
+  land_id: string;
+  name: string;
+  house_number: string;
+  structure: string;
+  floor_area_tsubo: string | number | null;
+  ownership_type: Building["ownershipType"];
+  description: string;
+  created_at: Date | null;
+  updated_at: Date | null;
+  owners: Owner[];
+  units: BuildingUnit[];
+}
+
+export function buildingJson(row: BuildingRow): Building {
+  return {
+    id: row.id,
+    name: row.name,
+    houseNumber: row.house_number,
+    structure: row.structure,
+    floorAreaTsubo: num(row.floor_area_tsubo),
+    ownershipType: row.ownership_type,
+    owners: row.owners,
+    units: row.units,
+    description: row.description,
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
+  };
+}
+
 /** _LAND_SELECT が返す行（lands × parcels × chibankuiki の JOIN + owners 集約）。 */
 export interface LandRow {
   id: string;
@@ -64,7 +105,7 @@ export interface LandRow {
   geometry: GeoJsonPolygon;
 }
 
-export function landJson(row: LandRow, visits?: Visit[]): Land {
+export function landJson(row: LandRow, visits?: Visit[], buildings?: Building[]): Land {
   const land: Land = {
     id: row.id,
     parcelId: row.parcel_id,
@@ -79,6 +120,7 @@ export function landJson(row: LandRow, visits?: Visit[]): Land {
     polygon: parcelRing(row.geometry),
   };
   if (visits !== undefined) land.visits = visits;
+  if (buildings !== undefined) land.buildings = buildings;
   return land;
 }
 

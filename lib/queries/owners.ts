@@ -1,7 +1,8 @@
 // ============================================================
 // 地権者ヘルパー（db.py の _parse_share / _replace_owners の移植）
-// land_owners テーブルへの全置換と持分文字列の分解。
-// サンプル生成・土地 CRUD の双方から使う。
+// land_owners / building_owners / building_unit_owners への全置換と
+// 持分文字列の分解。3 テーブルとも同形（name + share_num/share_den）なので
+// 置換処理は共通実装に寄せる。サンプル生成・CRUD の双方から使う。
 // ============================================================
 
 import type { Sql, TransactionSql } from "postgres";
@@ -24,20 +25,53 @@ export function parseShare(share: string | undefined | null): [number | null, nu
   return den > 0 ? [num, den] : [null, null];
 }
 
-/** 土地の地権者を全置換する（DELETE 旧 + INSERT 新）。name 空は捨てる。 */
-export async function replaceOwners(
+/** 所有者テーブル（land_owners と同形）を全置換する（DELETE 旧 + INSERT 新）。name 空は捨てる。 */
+async function replaceOwnersIn(
   sql: SqlLike,
-  landId: string,
+  table: string,
+  fkColumn: string,
+  parentId: string | number,
   owners: Owner[] | undefined | null,
 ): Promise<void> {
-  await sql`DELETE FROM land_owners WHERE land_id = ${landId}`;
+  await sql`DELETE FROM ${sql(table)} WHERE ${sql(fkColumn)} = ${parentId}`;
   for (const o of owners ?? []) {
     const name = (o?.name ?? "").trim();
     if (!name) continue;
     const [num, den] = parseShare(o?.share);
     await sql`
-      INSERT INTO land_owners (land_id, name, share_num, share_den)
-      VALUES (${landId}, ${name}, ${num}, ${den})
+      INSERT INTO ${sql(table)} ${sql({
+        [fkColumn]: parentId,
+        name,
+        share_num: num,
+        share_den: den,
+      })}
     `;
   }
+}
+
+/** 土地の地権者を全置換する。 */
+export async function replaceOwners(
+  sql: SqlLike,
+  landId: string,
+  owners: Owner[] | undefined | null,
+): Promise<void> {
+  await replaceOwnersIn(sql, "land_owners", "land_id", landId, owners);
+}
+
+/** 建物（一棟所有）の所有者を全置換する。 */
+export async function replaceBuildingOwners(
+  sql: SqlLike,
+  buildingId: string,
+  owners: Owner[] | undefined | null,
+): Promise<void> {
+  await replaceOwnersIn(sql, "building_owners", "building_id", buildingId, owners);
+}
+
+/** 専有部分の区分所有者を全置換する。 */
+export async function replaceUnitOwners(
+  sql: SqlLike,
+  unitId: number,
+  owners: Owner[] | undefined | null,
+): Promise<void> {
+  await replaceOwnersIn(sql, "building_unit_owners", "unit_id", unitId, owners);
 }

@@ -79,6 +79,61 @@ CREATE TABLE IF NOT EXISTS land_owners (
 );
 CREATE INDEX IF NOT EXISTS idx_land_owners_land ON land_owners (land_id, id);
 
+-- 建物（棟単位）。土地の上の建物で、所有形態で地権者の持ち方が変わる:
+--   sole  = 一棟所有（単独・共有）: 所有者は building_owners に持つ
+--   kubun = 区分所有（分譲マンション等）: 所有者は専有部分 building_units ごとに持つ
+CREATE TABLE IF NOT EXISTS buildings (
+    id               text PRIMARY KEY,
+    land_id          text NOT NULL REFERENCES lands(id) ON DELETE CASCADE,
+    name             text NOT NULL DEFAULT '',   -- 建物名称（例「上野パークハイツ」。空可）
+    house_number     text NOT NULL DEFAULT '',   -- 家屋番号（例「24番3」）
+    structure        text NOT NULL DEFAULT '',   -- 構造・階数（例「木造瓦葺2階建」）
+    floor_area_tsubo numeric,                    -- 延床面積（坪）。未把握は NULL
+    ownership_type   text NOT NULL DEFAULT 'sole' CHECK (ownership_type IN ('sole', 'kubun')),
+    description      text NOT NULL DEFAULT '',
+    created_at       timestamptz NOT NULL DEFAULT now(),
+    updated_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_buildings_land ON buildings (land_id, created_at);
+
+-- 一棟所有（sole）の所有者。land_owners と同形（持分は分子・分母の整数2列）
+CREATE TABLE IF NOT EXISTS building_owners (
+    id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- 追加順（= owners 配列の並び）
+    building_id text NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+    name        text NOT NULL,
+    share_num   integer,
+    share_den   integer,
+    CHECK ((share_num IS NULL) = (share_den IS NULL)),
+    CHECK (share_den IS NULL OR share_den > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_building_owners_building ON building_owners (building_id, id);
+
+-- 専有部分（区分所有 kubun のみ）。敷地権割合は土地に対する共有持分
+CREATE TABLE IF NOT EXISTS building_units (
+    id             integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- 追加順
+    building_id    text NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+    unit_number    text NOT NULL,      -- 部屋番号・専有部分の家屋番号（例「301」）
+    site_share_num integer,            -- 敷地権割合（分子）。未把握は NULL
+    site_share_den integer,
+    description    text NOT NULL DEFAULT '',
+    CHECK ((site_share_num IS NULL) = (site_share_den IS NULL)),
+    CHECK (site_share_den IS NULL OR site_share_den > 0),
+    UNIQUE (building_id, unit_number)
+);
+CREATE INDEX IF NOT EXISTS idx_building_units_building ON building_units (building_id, id);
+
+-- 専有部分の区分所有者。building_owners と同形
+CREATE TABLE IF NOT EXISTS building_unit_owners (
+    id        integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- 追加順
+    unit_id   integer NOT NULL REFERENCES building_units(id) ON DELETE CASCADE,
+    name      text NOT NULL,
+    share_num integer,
+    share_den integer,
+    CHECK ((share_num IS NULL) = (share_den IS NULL)),
+    CHECK (share_den IS NULL OR share_den > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_building_unit_owners_unit ON building_unit_owners (unit_id, id);
+
 CREATE TABLE IF NOT EXISTS visits (
     id            text PRIMARY KEY,
     land_id       text NOT NULL REFERENCES lands(id) ON DELETE CASCADE,

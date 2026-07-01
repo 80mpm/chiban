@@ -21,6 +21,39 @@ export interface FrontRoad {
   width: number;
 }
 
+/**
+ * 建物の所有形態。
+ * - sole  = 一棟所有（単独・共有）: 所有者は Building.owners
+ * - kubun = 区分所有（分譲マンション等）: 所有者は専有部分 Building.units ごと
+ */
+export type BuildingOwnershipType = "sole" | "kubun";
+
+/** 専有部分（区分所有建物の一室）。siteShare は敷地権割合の「分子/分母」文字列、未把握は空文字。 */
+export interface BuildingUnit {
+  id: number;
+  unitNumber: string;
+  owners: Owner[];
+  siteShare: string;
+  description: string;
+}
+
+/** 建物（棟単位）。土地に 1:N でぶら下がる。 */
+export interface Building {
+  id: string;
+  name: string;
+  houseNumber: string;
+  structure: string;
+  floorAreaTsubo: number | null;
+  ownershipType: BuildingOwnershipType;
+  /** 一棟所有（sole）の所有者。区分所有（kubun）では常に空配列。 */
+  owners: Owner[];
+  /** 区分所有（kubun）の専有部分。一棟所有（sole）では常に空配列。 */
+  units: BuildingUnit[];
+  description: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 /** 訪問記録（追加のみ）。 */
 export interface Visit {
   id: string;
@@ -50,6 +83,7 @@ export interface Land {
   updatedAt: string | null;
   polygon: LatLng[];
   visits?: Visit[];
+  buildings?: Building[];
 }
 
 /** 案件。 */
