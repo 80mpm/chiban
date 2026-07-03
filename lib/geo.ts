@@ -1,5 +1,6 @@
 // ============================================================
-// 幾何ヘルパー（db.py の parcel_ring / polygon_area_tsubo / convex_hull の移植）
+// 幾何ヘルパー（db.py の parcel_ring / polygon_area_tsubo / convex_hull の移植。
+// 面積は ㎡ 保存へ移行し polygonAreaM2 になった）
 // ============================================================
 
 import type { LatLng } from "./types";
@@ -20,11 +21,25 @@ export function parcelRing(geometry: GeoJsonPolygon): LatLng[] {
     .map(([lng, lat]) => [lat, lng] as LatLng);
 }
 
+/** 1 坪 = 3.305785 ㎡。 */
+export const M2_PER_TSUBO = 3.305785;
+
 /**
- * [[lat,lng]] ポリゴンの面積を坪で返す（重心緯度での平面近似 + 靴ひも公式）。
- * 1 坪 = 3.305785 ㎡。小数第 2 位で四捨五入。
+ * ㎡ → 坪（小数第 3 位以下は切り捨て）。null 透過（表示用）。
+ * 不動産の坪表記は面積を過大に見せない切り捨てが慣行
+ * （地権者一覧シートも 2.51㎡ → 0.75坪、267.86㎡ → 81.02坪）。
+ * 1e-9 は浮動小数の誤差で 1 つ下に落ちるのを防ぐ補正。
  */
-export function polygonAreaTsubo(latlngs: LatLng[]): number {
+export function m2ToTsubo(m2: number | null): number | null {
+  if (m2 === null || m2 === undefined || !Number.isFinite(Number(m2))) return null;
+  return Math.floor((Number(m2) / M2_PER_TSUBO) * 100 + 1e-9) / 100;
+}
+
+/**
+ * [[lat,lng]] ポリゴンの面積を ㎡ で返す（重心緯度での平面近似 + 靴ひも公式）。
+ * 小数第 2 位で四捨五入。保存単位は登記の正本にあわせ ㎡（坪は表示時に換算）。
+ */
+export function polygonAreaM2(latlngs: LatLng[]): number {
   if (!latlngs || latlngs.length < 3) return 0;
   const lat0 = latlngs.reduce((s, p) => s + p[0], 0) / latlngs.length;
   const lng0 = latlngs[0][1];
@@ -40,7 +55,7 @@ export function polygonAreaTsubo(latlngs: LatLng[]): number {
     area2 += x1 * y2 - x2 * y1;
   }
   const sqm = Math.abs(area2) / 2;
-  return Math.round((sqm / 3.305785) * 100) / 100;
+  return Math.round(sqm * 100) / 100;
 }
 
 /**

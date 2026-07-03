@@ -4,7 +4,7 @@
 // 純関数なのでテスト容易。SVG 描画は KouzuView が担う。
 // ============================================================
 
-import { polygonAreaTsubo } from "@/lib/geo";
+import { polygonAreaM2 } from "@/lib/geo";
 import type { LatLng } from "@/lib/types";
 
 export interface KouzuLayout {
@@ -48,7 +48,7 @@ export function computeKouzuLayout(
 
   const base = labelPolys.length ? labelPolys : allPolys;
   const avgAreaM2 =
-    base.reduce((s, poly) => s + polygonAreaTsubo(poly) * 3.305785, 0) / base.length;
+    base.reduce((s, poly) => s + polygonAreaM2(poly), 0) / base.length;
   const fontSize = Math.min(extent / 30, Math.sqrt(avgAreaM2) * 0.16);
 
   const toView = (p: LatLng): [number, number] => {

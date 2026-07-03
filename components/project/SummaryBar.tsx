@@ -42,8 +42,11 @@ export function SummaryBar({ project }: { project: Project }) {
       <div className="flex items-stretch">
         <SumItem label="住所" value={project.address} flex="2 1 0" />
         <SumItem label="総坪数" value={totalTsubo > 0 ? `${fmtTsubo(totalTsubo)} 坪` : null} />
+        <SumItem label="用途地域" value={project.zoning} />
+        <SumItem label="建蔽率" value={project.currentBcr != null ? `${project.currentBcr}%` : null} />
         <SumItem label="容積率" value={project.currentFar != null ? `${project.currentFar}%` : null} />
         <SumItem label="想定容積率" value={project.targetFar != null ? `${project.targetFar}%` : null} />
+        <SumItem label="担当" value={project.staff} />
         <Link
           href={`/projects/${encodeURIComponent(project.id)}/edit`}
           className="my-0 mx-4 flex-none self-center whitespace-nowrap rounded-md bg-brand px-3.5 py-1.5 text-xs font-semibold text-white no-underline hover:bg-[#0a78ad]"

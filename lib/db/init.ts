@@ -39,6 +39,31 @@ async function checkSchemaVersion(): Promise<void> {
       "旧スキーマ（lands.owners）のデータベースです。`docker compose down -v && docker compose up -d` で初期化してから再起動してください",
     );
   }
+
+  const landOwnersExists = await sql`
+    SELECT 1 FROM information_schema.tables WHERE table_name = 'land_owners'
+  `;
+  if (landOwnersExists.length === 0) return; // 新規 DB（CREATE TABLE で作られる）
+
+  const hasOwnerDescription = await sql`
+    SELECT 1 FROM information_schema.columns
+     WHERE table_name = 'land_owners' AND column_name = 'description'
+  `;
+  if (hasOwnerDescription.length === 0) {
+    throw new Error(
+      "旧スキーマ（land_owners に所有者住所・登記原因・備考なし）のデータベースです。`docker compose down -v && docker compose up -d` で初期化してから再起動してください",
+    );
+  }
+
+  const hasAreaM2 = await sql`
+    SELECT 1 FROM information_schema.columns
+     WHERE table_name = 'lands' AND column_name = 'area_m2'
+  `;
+  if (hasAreaM2.length === 0) {
+    throw new Error(
+      "旧スキーマ（lands.area_tsubo 坪保存）のデータベースです。`docker compose down -v && docker compose up -d` で初期化してから再起動してください",
+    );
+  }
 }
 
 async function initDb(): Promise<void> {

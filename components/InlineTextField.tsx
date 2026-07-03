@@ -4,7 +4,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import { Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type FieldType = "input" | "textarea" | "number";
+type FieldType = "input" | "textarea" | "number" | "date";
 
 /**
  * 鉛筆 → 入力 → 確定(✓)/取消(✕) のインライン編集（旧 common.js setupInlineTextField）。
@@ -123,7 +123,7 @@ export function InlineTextField({
       ) : (
         <input
           ref={ref as React.RefObject<HTMLInputElement>}
-          type={type === "number" ? "number" : "text"}
+          type={type === "number" ? "number" : type === "date" ? "date" : "text"}
           min={type === "number" ? 0 : undefined}
           step={type === "number" ? 0.1 : undefined}
           placeholder={placeholder}

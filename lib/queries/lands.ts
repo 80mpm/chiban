@@ -8,12 +8,14 @@ import { sql } from "../db/client";
 import { ensureDbReady } from "../db/init";
 import { uuid } from "../db/ids";
 import { ApiError, isUniqueViolation } from "../api-error";
-import { parcelRing, polygonAreaTsubo, type GeoJsonPolygon } from "../geo";
+import { parcelRing, polygonAreaM2, type GeoJsonPolygon } from "../geo";
 import { parseProjectId, parseParcelId } from "./helpers";
 import { replaceOwners } from "./owners";
+import { replaceMortgagesInto } from "./mortgages";
+import { replaceBuildings, fetchBuildingsByLand } from "./buildings";
 import { LAND_SELECT } from "./projects";
 import { landJson, type LandRow } from "./serialize";
-import type { Land, LandStatus, Owner } from "../types";
+import type { Building, Land, LandStatus, Mortgage, Owner } from "../types";
 
 type SqlLike = Sql | TransactionSql;
 
@@ -50,7 +52,9 @@ interface CreateLandFields {
   status?: string;
   owners?: Owner[];
   description?: string;
-  areaTsubo?: number | null;
+  areaM2?: number | null;
+  mortgages?: Mortgage[];
+  buildings?: Building[];
 }
 
 export async function createLand(
@@ -70,12 +74,12 @@ export async function createLand(
       throw new ApiError(400, "不正なステータスです");
     }
     const area =
-      fields.areaTsubo ?? polygonAreaTsubo(parcelRing(parcel.geometry));
+      fields.areaM2 ?? polygonAreaM2(parcelRing(parcel.geometry));
     const landId = uuid();
 
     try {
       await tx`
-        INSERT INTO lands (id, project_id, parcel_id, description, area_tsubo, status)
+        INSERT INTO lands (id, project_id, parcel_id, description, area_m2, status)
         VALUES (${landId}, ${pid}, ${parcel.id}, ${fields.description ?? ""}, ${area}, ${status})
       `;
     } catch (e) {
@@ -85,9 +89,12 @@ export async function createLand(
       throw e;
     }
     await replaceOwners(tx, landId, fields.owners);
+    await replaceMortgagesInto(tx, "land_mortgages", "land_id", landId, fields.mortgages);
+    await replaceBuildings(tx, landId, fields.buildings);
     await tx`UPDATE projects SET updated_at = now() WHERE id = ${pid}`;
     const row = await fetchLandJoined(tx, pid, landId);
-    return landJson(row, []);
+    const buildings = (await fetchBuildingsByLand(tx, [landId])).get(landId) ?? [];
+    return landJson(row, [], buildings);
   });
 }
 
@@ -114,8 +121,8 @@ export async function updateLand(
       const parcel = await fetchParcel(tx, fields.parcelId);
       params.push(parcel.id);
       sets.push(`parcel_id = $${params.length}`);
-      params.push(polygonAreaTsubo(parcelRing(parcel.geometry)));
-      sets.push(`area_tsubo = $${params.length}`);
+      params.push(polygonAreaM2(parcelRing(parcel.geometry)));
+      sets.push(`area_m2 = $${params.length}`);
     }
     if ("owners" in fields) {
       await replaceOwners(
@@ -124,13 +131,29 @@ export async function updateLand(
         Array.isArray(fields.owners) ? (fields.owners as Owner[]) : [],
       );
     }
+    if ("mortgages" in fields) {
+      await replaceMortgagesInto(
+        tx,
+        "land_mortgages",
+        "land_id",
+        landId,
+        Array.isArray(fields.mortgages) ? (fields.mortgages as Mortgage[]) : [],
+      );
+    }
+    if ("buildings" in fields) {
+      await replaceBuildings(
+        tx,
+        landId,
+        Array.isArray(fields.buildings) ? (fields.buildings as Building[]) : [],
+      );
+    }
     if ("description" in fields) {
       params.push(fields.description ?? "");
       sets.push(`description = $${params.length}`);
     }
-    if ("areaTsubo" in fields && fields.areaTsubo !== null && fields.areaTsubo !== undefined) {
-      params.push(fields.areaTsubo);
-      sets.push(`area_tsubo = $${params.length}`);
+    if ("areaM2" in fields && fields.areaM2 !== null && fields.areaM2 !== undefined) {
+      params.push(fields.areaM2);
+      sets.push(`area_m2 = $${params.length}`);
     }
     if ("status" in fields) {
       if (fields.status !== "target" && fields.status !== "acquired") {
@@ -154,7 +177,8 @@ export async function updateLand(
       throw e;
     }
     const row = await fetchLandJoined(tx, pid, landId);
-    return landJson(row); // visits はクライアント側で保持
+    const buildings = (await fetchBuildingsByLand(tx, [landId])).get(landId) ?? [];
+    return landJson(row, undefined, buildings); // visits はクライアント側で保持
   });
 }
 

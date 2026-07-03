@@ -3,7 +3,7 @@
 // クライアント・サーバ双方から使える純関数。
 // ============================================================
 
-import type { Owner, LandStatus } from "./types";
+import type { Owner, LandStatus, Building, Mortgage } from "./types";
 
 /** ステータス定義（label / color）。 */
 export const STATUS_DEFS: Record<LandStatus, { label: string; color: string }> = {
@@ -25,20 +25,43 @@ export function formatOwners(owners: Owner[] | undefined | null): string {
     .join("・");
 }
 
-/** 表示用文字列を owners 配列にパースする（formatOwners の逆）。 */
-export function parseOwners(text: string): Owner[] {
-  const src = (text || "").trim();
-  if (!src) return [];
-  return src
-    .split(/[・、,]/)
-    .map((part) => part.trim())
+/** 空の地権者（行編集 UI の新規行テンプレート）。 */
+export function emptyOwner(): Owner {
+  return { name: "", share: "", address: "", regDate: "", regCause: "", description: "" };
+}
+
+/**
+ * 登記日 + 登記原因を 1 行に整形する（例「平成14年10月14日 相続」→ '2002-10-14 相続'
+ * は fmtDateOnly で '2002/10/14 相続'）。両方空なら ''。
+ */
+export function formatRegistration(o: Owner): string {
+  return [fmtDateOnly(o.regDate), o.regCause].filter(Boolean).join(" ");
+}
+
+/**
+ * 抵当権を「設定日 金額 抵当権者」で1行に整形する（空項目は省く）。
+ * 例: 2018/3/19 3906万円 中国銀行股份有限公司
+ */
+export function formatMortgage(m: Mortgage): string {
+  return [
+    fmtDateOnly(m.date),
+    m.amount != null ? `${m.amount}万円` : "",
+    m.holder,
+  ]
     .filter(Boolean)
-    .map((part) => {
-      const m = part.match(/^(.+?)\s*[（(](?:持分)?\s*(.+?)\s*[）)]\s*$/);
-      return m
-        ? { name: m[1].trim(), share: m[2].trim() }
-        : { name: part, share: "" };
-    });
+    .join(" ");
+}
+
+/**
+ * 建物の属性を「種類／構造／床面積」で1行に整形する（空項目は省く）。
+ * 例: 居宅／木造瓦葺2階建／96.52㎡
+ */
+export function formatBuilding(b: Building): string {
+  const parts: string[] = [];
+  if (b.usage) parts.push(b.usage);
+  if (b.structure) parts.push(b.structure);
+  if (b.floorArea !== null && b.floorArea !== undefined) parts.push(`${b.floorArea}㎡`);
+  return parts.join("／");
 }
 
 /** 坪数を小数点以下2桁までで整形する（合計値の浮動小数誤差も丸める。末尾0は省く）。 */

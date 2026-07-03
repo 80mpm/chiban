@@ -18,3 +18,7 @@ kouzu_parcels_seed.json.gz
 __pycache__/
 .vercel/
 .venv/
+
+# 参考資料（ランドメイク資料・ゼンリン資料。ZENRIN 設定完了通知書 = 資格情報を含むためコミットしない）
+/docs/
+.DS_Store

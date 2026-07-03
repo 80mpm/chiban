@@ -7,6 +7,9 @@ import { sql } from "../db/client";
 import { ensureDbReady } from "../db/init";
 import { ApiError } from "../api-error";
 import { parseProjectId } from "./helpers";
+import { fetchBuildingsByLand } from "./buildings";
+import { ownersSelect } from "./owners";
+import { mortgagesSelect } from "./mortgages";
 import {
   landJson,
   projectJson,
@@ -15,24 +18,18 @@ import {
   type ProjectRow,
   type VisitRow,
 } from "./serialize";
-import type { Project, Visit, Land } from "../types";
+import type { Project, Visit, Land, Building } from "../types";
 
 /**
- * lands × parcels × chibankuiki を JOIN し、owners を land_owners から
+ * lands × parcels × chibankuiki を JOIN し、owners / mortgages を子テーブルから
  * jsonb_agg で集約する SELECT 句。aza/chiban/geometry を導出し、
- * owners は id 順（追加順）で [{name, share}] に組み立てる。
+ * owners・mortgages は id 順（追加順）で組み立てる。
  * パラメータを持たないので sql.unsafe で使う。
  */
 export const LAND_SELECT = `
     SELECT l.*, c.name AS aza, p.chiban, p.geometry,
-           COALESCE((
-             SELECT jsonb_agg(jsonb_build_object(
-                      'name', o.name,
-                      'share', CASE WHEN o.share_num IS NOT NULL
-                                    THEN o.share_num || '/' || o.share_den ELSE '' END
-                    ) ORDER BY o.id)
-               FROM land_owners o WHERE o.land_id = l.id
-           ), '[]'::jsonb) AS owners
+           ${ownersSelect("land_owners", "land_id", "l")},
+           ${mortgagesSelect("land_mortgages", "land_id", "l")}
       FROM lands l
       JOIN parcels p ON p.id = l.parcel_id
       JOIN chibankuiki c ON c.id = p.chibankuiki_id
@@ -57,10 +54,15 @@ export async function getProjectsTree(): Promise<Project[]> {
     visitsByLand.get(landId)!.push(visitJson(v));
   }
 
+  const buildingsByLand = await fetchBuildingsByLand(sql);
+  const emptyBuildings: Building[] = [];
+
   const landsByProj = new Map<number, Land[]>();
   for (const l of landRows) {
     if (!landsByProj.has(l.project_id)) landsByProj.set(l.project_id, []);
-    landsByProj.get(l.project_id)!.push(landJson(l, visitsByLand.get(l.id) ?? []));
+    landsByProj
+      .get(l.project_id)!
+      .push(landJson(l, visitsByLand.get(l.id) ?? [], buildingsByLand.get(l.id) ?? emptyBuildings));
   }
 
   return projRows.map((p) => projectJson(p, landsByProj.get(p.id) ?? []));
@@ -76,8 +78,11 @@ interface ProjectFields {
   polygon?: unknown;
   address?: string | null;
   access?: string | null;
+  staff?: string | null;
+  currentBcr?: number | null;
   currentFar?: number | null;
   targetFar?: number | null;
+  zoning?: string | null;
   frontRoads?: unknown;
 }
 
@@ -116,8 +121,11 @@ export async function updateProject(
   const polygon = has("polygon") ? fields.polygon || null : cur.polygon;
   const address = has("address") ? (fields.address ?? null) : cur.address;
   const access = has("access") ? (fields.access ?? null) : cur.access;
+  const staff = has("staff") ? (fields.staff ?? null) : cur.staff;
+  const currentBcr = has("currentBcr") ? (fields.currentBcr ?? null) : cur.current_bcr;
   const currentFar = has("currentFar") ? (fields.currentFar ?? null) : cur.current_far;
   const targetFar = has("targetFar") ? (fields.targetFar ?? null) : cur.target_far;
+  const zoning = has("zoning") ? (fields.zoning ?? null) : cur.zoning;
   const frontRoads = has("frontRoads")
     ? Array.isArray(fields.frontRoads)
       ? fields.frontRoads
@@ -131,8 +139,11 @@ export async function updateProject(
       polygon = ${polygon ? sql.json(polygon as never) : null},
       address = ${address as never},
       access = ${access as never},
+      staff = ${staff as never},
+      current_bcr = ${currentBcr as never},
       current_far = ${currentFar as never},
       target_far = ${targetFar as never},
+      zoning = ${zoning as never},
       front_roads = ${sql.json(frontRoads as never)},
       updated_at = now()
     WHERE id = ${pid} RETURNING *

@@ -48,8 +48,11 @@ CREATE TABLE IF NOT EXISTS projects (
     polygon     jsonb,                     -- 案件領域 [[lat,lng], ...]
     address     text,
     access      text,
+    staff       text,                      -- 担当者名
+    current_bcr numeric,                   -- 現況建蔽率（%）
     current_far numeric,
     target_far  numeric,
+    zoning      text,                      -- 用途地域（例「商業」）
     front_roads jsonb NOT NULL DEFAULT '[]',
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()
@@ -60,7 +63,7 @@ CREATE TABLE IF NOT EXISTS lands (
     project_id  integer NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     parcel_id   integer NOT NULL REFERENCES parcels(id),
     description text NOT NULL DEFAULT '',
-    area_tsubo  numeric NOT NULL DEFAULT 0,
+    area_m2     numeric NOT NULL DEFAULT 0,  -- 面積（㎡。登記の正本単位。坪は表示時に換算）
     status      text NOT NULL DEFAULT 'target' CHECK (status IN ('target', 'acquired')),
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now(),
@@ -74,10 +77,64 @@ CREATE TABLE IF NOT EXISTS land_owners (
     name      text NOT NULL,
     share_num integer,
     share_den integer,
+    address     text NOT NULL DEFAULT '',  -- 所有者住所
+    reg_date    date,                      -- 登記日（未設定は NULL ↔ API では ''）
+    reg_cause   text NOT NULL DEFAULT '',  -- 登記原因（相続/売買/遺贈 等）
+    description text NOT NULL DEFAULT '',  -- 備考
     CHECK ((share_num IS NULL) = (share_den IS NULL)),
     CHECK (share_den IS NULL OR share_den > 0)
 );
 CREATE INDEX IF NOT EXISTS idx_land_owners_land ON land_owners (land_id, id);
+
+-- 抵当権（土地の子。owners と同型の全置換・追加順保持）
+CREATE TABLE IF NOT EXISTS land_mortgages (
+    id      integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    land_id text NOT NULL REFERENCES lands(id) ON DELETE CASCADE,
+    date    date,                          -- 設定日（未設定は NULL ↔ API では ''）
+    amount  numeric,                       -- 債権額（万円）。未設定は NULL
+    holder  text NOT NULL DEFAULT ''       -- 抵当権者
+);
+CREATE INDEX IF NOT EXISTS idx_land_mortgages_land ON land_mortgages (land_id, id);
+
+-- 建物（土地の子。土地とは別に登記され地権者も異なりうる。更地は建物なし）
+CREATE TABLE IF NOT EXISTS buildings (
+    id           text PRIMARY KEY,
+    land_id      text NOT NULL REFERENCES lands(id) ON DELETE CASCADE,
+    kaoku_number text NOT NULL DEFAULT '',   -- 家屋番号
+    structure    text NOT NULL DEFAULT '',   -- 構造（例「木造2階建」）
+    usage        text NOT NULL DEFAULT '',   -- 種類・用途（非予約語。静的 INSERT で使うため引用符不要）
+    floor_area   numeric,                    -- 床面積（㎡）。未設定は NULL
+    built_date   date,                       -- 新築年月日（未設定は NULL ↔ API では ''）
+    description  text NOT NULL DEFAULT '',   -- 備考
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    updated_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_buildings_land ON buildings (land_id, created_at, id);
+
+CREATE TABLE IF NOT EXISTS building_owners (
+    id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- 追加順（= owners 配列の並び）
+    building_id text NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+    name        text NOT NULL,
+    share_num   integer,
+    share_den   integer,
+    address     text NOT NULL DEFAULT '',    -- 所有者住所
+    reg_date    date,                        -- 登記日（未設定は NULL ↔ API では ''）
+    reg_cause   text NOT NULL DEFAULT '',    -- 登記原因（相続/売買/遺贈 等）
+    description text NOT NULL DEFAULT '',    -- 備考
+    CHECK ((share_num IS NULL) = (share_den IS NULL)),
+    CHECK (share_den IS NULL OR share_den > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_building_owners_building ON building_owners (building_id, id);
+
+-- 抵当権（建物の子。land_mortgages と同型）
+CREATE TABLE IF NOT EXISTS building_mortgages (
+    id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    building_id text NOT NULL REFERENCES buildings(id) ON DELETE CASCADE,
+    date        date,                        -- 設定日（未設定は NULL ↔ API では ''）
+    amount      numeric,                     -- 債権額（万円）。未設定は NULL
+    holder      text NOT NULL DEFAULT ''     -- 抵当権者
+);
+CREATE INDEX IF NOT EXISTS idx_building_mortgages_building ON building_mortgages (building_id, id);
 
 CREATE TABLE IF NOT EXISTS visits (
     id            text PRIMARY KEY,

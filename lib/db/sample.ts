@@ -7,9 +7,11 @@
 import type { Sql, TransactionSql } from "postgres";
 import { sql } from "./client";
 import { uuid } from "./ids";
-import { parcelRing, polygonAreaTsubo, convexHull, type GeoJsonPolygon } from "../geo";
+import { parcelRing, polygonAreaM2, convexHull, type GeoJsonPolygon } from "../geo";
 import { replaceOwners } from "../queries/owners";
-import type { LatLng, Owner, LandStatus } from "../types";
+import { replaceMortgagesInto } from "../queries/mortgages";
+import { replaceBuildings } from "../queries/buildings";
+import type { LatLng, Owner, LandStatus, Building, Mortgage } from "../types";
 
 type SqlLike = Sql | TransactionSql;
 
@@ -82,15 +84,61 @@ function visit(
   return { user, comment, date, directOrTel, meetingType, nextDate, progress, principal };
 }
 
+/** 地権者（付帯情報は省略可。地権者名・住所・抵当権者はすべて架空）。 */
+function owner(
+  name: string,
+  share = "",
+  address = "",
+  regDate = "",
+  regCause = "",
+  description = "",
+): Owner {
+  return { name, share, address, regDate, regCause, description };
+}
+
+/** 抵当権（date は 'YYYY-MM-DD'・amount は万円）。 */
+function mortgage(date: string, amount: number | null, holder: string): Mortgage {
+  return { date, amount, holder };
+}
+
+function building(
+  kaokuNumber: string,
+  structure: string,
+  usage: string,
+  floorArea: number | null,
+  owners: Owner[],
+  extras: Partial<Pick<SampleBuilding, "builtDate" | "description" | "mortgages">> = {},
+): SampleBuilding {
+  return {
+    kaokuNumber,
+    structure,
+    usage,
+    floorArea,
+    owners,
+    builtDate: "",
+    description: "",
+    mortgages: [],
+    ...extras,
+  };
+}
+
+/** サンプル建物（id は投入時に採番するため持たない）。 */
+type SampleBuilding = Pick<
+  Building,
+  "kaokuNumber" | "structure" | "usage" | "floorArea" | "builtDate" | "description" | "owners" | "mortgages"
+>;
+
 interface SampleLand {
   parcelId: number;
   owners: Owner[];
   description: string;
-  areaTsubo: number;
+  areaM2: number;
   status: LandStatus;
   createdAt: Date;
   updatedAt: Date;
   visits: SampleVisit[];
+  mortgages?: Mortgage[];
+  buildings?: SampleBuilding[];
   _ring: LatLng[];
 }
 
@@ -103,8 +151,11 @@ interface SampleProject {
   polygon: LatLng[] | null;
   address?: string;
   access?: string;
+  staff?: string;
+  currentBcr?: number;
   currentFar?: number;
   targetFar?: number;
+  zoning?: string;
   frontRoads: { edgeIndex: number; width: number }[];
   lands: SampleLand[];
 }
@@ -138,9 +189,9 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
     const ring = parcelRing(parcel.geometry);
     return {
       parcelId: parcel.id,
-      owners: [{ name: OWNER_POOL[idx % OWNER_POOL.length], share: "" }],
+      owners: [owner(OWNER_POOL[idx % OWNER_POOL.length])],
       description: "",
-      areaTsubo: polygonAreaTsubo(ring),
+      areaM2: polygonAreaM2(ring),
       status: "target",
       createdAt: t(9),
       updatedAt: t(2),
@@ -188,12 +239,24 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
   const shinTokyoLands = (
     await Promise.all([
       nishiAsakusaLand("24-3", {
-        owners: [{ name: "安野政子", share: "" }],
+        owners: [
+          owner("安野政子", "", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続"),
+        ],
         description:
           "個人名義（安野氏）。世帯主と早期に条件合意し、所有権移転登記まで完了済み",
         status: "acquired",
         createdAt: t(8),
         updatedAt: t(3),
+        buildings: [
+          building(
+            "西浅草二丁目24番3",
+            "木造瓦葺2階建",
+            "居宅",
+            96.52,
+            [owner("安野政子", "", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続")],
+            { builtDate: "1972-08-31" },
+          ),
+        ],
         visits: [
           visit("木村", "初回訪問。安野様にご挨拶し、再開発計画の概要を説明。本人は売却に前向き。", t(8), "直", "面談(対面)", t(5), "B", "principal"),
           visit("木村", "条件合意。売買契約締結・所有権移転登記完了。", t(3), "直", "面談(対面)", null, "初期見込み", "principal"),
@@ -201,20 +264,35 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
       }),
       nishiAsakusaLand("23-1", {
         owners: [
-          { name: "中嶋幸子", share: "1520/6755" },
-          { name: "中嶋直美", share: "5235/6755" },
+          owner("中嶋幸子", "1520/6755", "東京都台東区西浅草二丁目23番1号", "1994-04-22", "相続", "高齢のため意思確認は長女の直美氏経由"),
+          owner("中嶋直美", "5235/6755", "東京都台東区西浅草二丁目23番1号", "1994-04-22", "相続"),
         ],
         description:
           "中嶋家2名の共有名義（持分比は不均等）。主たる持分を握る中嶋直美氏が窓口となり、所有権移転登記完了",
         status: "acquired",
         createdAt: t(6),
         updatedAt: t(6),
+        buildings: [
+          building(
+            "西浅草二丁目23番1",
+            "鉄骨造陸屋根3階建",
+            "共同住宅",
+            210.35,
+            [owner("中嶋直美", "", "東京都台東区西浅草二丁目23番1号", "2013-06-27", "売買")],
+            {
+              builtDate: "1969-08-05",
+              mortgages: [mortgage("2013-06-03", 3860, "XYZ信用金庫")],
+            },
+          ),
+        ],
         visits: [
           visit("木村", "持分の多い中嶋直美氏が窓口となり、共有者全員から押印取得。所有権移転登記完了。", t(6), "直", "面談(対面)", null, "初期見込み", "principal"),
         ],
       }),
       nishiAsakusaLand("24-6", {
-        owners: [{ name: "安野政子", share: "" }],
+        owners: [
+          owner("安野政子", "", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続"),
+        ],
         description:
           "個人名義（安野氏）の小規模筆。隣地 24-3 と一体活用を前提に交渉、スムーズに取得完了",
         status: "acquired",
@@ -225,11 +303,29 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
         ],
       }),
       nishiAsakusaLand("24-5", {
-        owners: [{ name: "株式会社メイクス", share: "" }],
-        description: "法人名義。代表と面談中、社内決裁を待っている段階",
+        owners: [
+          owner("株式会社メイクス", "", "東京都中央区日本橋三丁目2番1号", "2018-03-19", "売買", "窓口は総務部（代表電話経由）"),
+        ],
+        description:
+          "土地は法人（メイクス社）名義だが、地上の建物は個人（大森氏）名義の借地。土地・建物で権利者が異なり、双方との交渉が必要",
         status: "target",
         createdAt: t(4),
         updatedAt: t(1),
+        mortgages: [mortgage("2018-03-19", 3906, "ABC銀行")],
+        buildings: [
+          building(
+            "西浅草二丁目24番5",
+            "木造亜鉛メッキ鋼板葺2階建",
+            "居宅兼店舗",
+            74.18,
+            [owner("大森健太郎", "", "東京都台東区西浅草二丁目24番5号", "1999-11-09", "所有権保存")],
+            {
+              builtDate: "1999-11-09",
+              description: "借地上建物（底地はメイクス社名義）",
+              mortgages: [mortgage("1999-11-09", 740, "XYZ信用金庫")],
+            },
+          ),
+        ],
         visits: [
           visit("本田", "初回訪問。代表に再開発の趣旨を説明、社内検討のため資料を持ち帰り。", t(4), "直", "面談(対面)", t(2), "初期見込み", "principal"),
           visit("木村", "代表より社内決裁待ちとの回答。次回は最終条件を提示予定。", t(1), "TEL", "面談(ITP)", tAt(-2, 15, 30), "B", "non_principal"),
@@ -247,8 +343,11 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
     polygon: BASE_POLYGON,
     address: "東京都台東区西浅草2-4-8",
     access: "東京メトロ銀座線「田原町」駅 徒歩5分 / つくばエクスプレス「浅草」駅 徒歩5分",
+    staff: "木村",
+    currentBcr: 80,
     currentFar: 500,
     targetFar: 457,
+    zoning: "商業",
     frontRoads: [
       { edgeIndex: 0, width: 6 },
       { edgeIndex: 1, width: 6 },
@@ -293,32 +392,44 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
       description: "区画整理済みの整形地22筆を一体で取得し、共同住宅用地として開発する大型案件",
       address: "東京都台東区根岸3丁目",
       access: "JR山手線「鶯谷」駅 徒歩5分",
+      staff: "佐藤",
+      currentBcr: 60,
       currentFar: 400,
       targetFar: 480,
+      zoning: "第一種住居",
     }, negishiOverrides),
     await buildProject(3, "上野三丁目", UENO_CHIBANS, {
       name: "上野三丁目計画",
       description: "御徒町駅至近の商業地。中規模オフィスビル建設用地として8筆を取りまとめ",
       address: "東京都台東区上野3丁目",
       access: "JR山手線「御徒町」駅 徒歩3分 / 東京メトロ銀座線「上野広小路」駅 徒歩4分",
+      staff: "本田",
+      currentBcr: 80,
       currentFar: 600,
       targetFar: 700,
+      zoning: "商業",
     }, uenoOverrides),
     await buildProject(4, "秋葉原", AKIHABARA_CHIBANS, {
       name: "秋葉原計画",
       description: "秋葉原駅近接の4筆。隣接地権者の意向確認を開始した初期段階の案件",
       address: "東京都台東区秋葉原",
       access: "JR山手線「秋葉原」駅 徒歩4分",
+      staff: "本田",
+      currentBcr: 80,
       currentFar: 600,
       targetFar: 600,
+      zoning: "商業",
     }),
     await buildProject(5, "上野三丁目", UENO_DAINI_CHIBANS, {
       name: "上野三丁目第二計画",
       description: "上野三丁目計画の隣接街区18筆。第一計画の進捗を見ながら順次接触予定",
       address: "東京都台東区上野3丁目",
       access: "JR山手線「御徒町」駅 徒歩4分",
+      staff: "佐藤",
+      currentBcr: 80,
       currentFar: 600,
       targetFar: 650,
+      zoning: "商業",
     }),
   ];
 }
@@ -329,12 +440,14 @@ export async function insertSamples(db: SqlLike): Promise<void> {
   for (const proj of projects) {
     await db`
       INSERT INTO projects (id, name, description, polygon, address, access,
-                            current_far, target_far, front_roads, created_at, updated_at)
+                            staff, current_bcr, current_far, target_far, zoning,
+                            front_roads, created_at, updated_at)
       VALUES (
         ${proj.id}, ${proj.name ?? ""}, ${proj.description ?? ""},
         ${proj.polygon ? db.json(proj.polygon) : null},
         ${proj.address ?? null}, ${proj.access ?? null},
-        ${proj.currentFar ?? null}, ${proj.targetFar ?? null},
+        ${proj.staff ?? null}, ${proj.currentBcr ?? null},
+        ${proj.currentFar ?? null}, ${proj.targetFar ?? null}, ${proj.zoning ?? null},
         ${db.json(proj.frontRoads ?? [])}, ${proj.createdAt}, ${proj.updatedAt}
       )
     `;
@@ -342,11 +455,22 @@ export async function insertSamples(db: SqlLike): Promise<void> {
       const landId = uuid();
       await db`
         INSERT INTO lands (id, project_id, parcel_id, description,
-                           area_tsubo, status, created_at, updated_at)
+                           area_m2, status, created_at, updated_at)
         VALUES (${landId}, ${proj.id}, ${land.parcelId}, ${land.description},
-                ${land.areaTsubo}, ${land.status}, ${land.createdAt}, ${land.updatedAt})
+                ${land.areaM2}, ${land.status}, ${land.createdAt}, ${land.updatedAt})
       `;
       await replaceOwners(db, landId, land.owners);
+      await replaceMortgagesInto(db, "land_mortgages", "land_id", landId, land.mortgages ?? []);
+      await replaceBuildings(
+        db,
+        landId,
+        (land.buildings ?? []).map((b) => ({
+          id: "",
+          ...b,
+          createdAt: null,
+          updatedAt: null,
+        })),
+      );
       for (const v of land.visits) {
         await db`
           INSERT INTO visits (id, land_id, user_name, comment, date,
@@ -367,7 +491,8 @@ export async function insertSamples(db: SqlLike): Promise<void> {
 /** 案件・土地・訪問記録を破棄してサンプルを再投入する（筆マスタは残す）。 */
 export async function resetSamples(): Promise<void> {
   await sql.begin(async (tx) => {
-    await tx`TRUNCATE visits, land_owners, lands, projects RESTART IDENTITY CASCADE`;
+    await tx`TRUNCATE visits, building_mortgages, building_owners, buildings,
+             land_mortgages, land_owners, lands, projects RESTART IDENTITY CASCADE`;
     await insertSamples(tx);
     await tx`
       INSERT INTO app_meta (key, value) VALUES ('seeded', '1')

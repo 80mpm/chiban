@@ -146,7 +146,10 @@ export function ProjectEditClient({
   const fieldLabel = "text-sm text-muted-foreground";
 
   return (
-    <main className="mx-auto h-full max-w-6xl space-y-4 overflow-y-auto p-6">
+    // スクロールは全幅の外側ラッパーに持たせる（中央寄せの main に持たせると
+    // ウィンドウが広いとき左右の余白でホイールが効かない）
+    <div className="h-full overflow-y-auto">
+      <main className="mx-auto max-w-6xl space-y-4 p-6">
       {/* パンくず + タイトル */}
       <div>
         <div className="text-xs text-muted-foreground">
@@ -223,6 +226,30 @@ export function ProjectEditClient({
 
             <label className={fieldLabel}>アクセス</label>
             <InlineTextField type="textarea" placeholder="例：東京メトロ銀座線「田原町」駅 徒歩5分" value={proj.access || ""} onConfirm={(next) => saveProject({ access: next.trim() })} />
+
+            <label className={fieldLabel}>担当</label>
+            <InlineTextField type="input" placeholder="例：上澤" value={proj.staff || ""} onConfirm={(next) => saveProject({ staff: next.trim() || null })} />
+
+            <label className={fieldLabel}>用途地域</label>
+            <InlineTextField type="input" placeholder="例：商業" value={proj.zoning || ""} onConfirm={(next) => saveProject({ zoning: next.trim() || null })} />
+
+            <label className={fieldLabel}>建蔽率</label>
+            <InlineTextField
+              type="number"
+              placeholder="例：80"
+              value={proj.currentBcr}
+              formatDisplay={(v) => `${v}%`}
+              onConfirm={(next) => {
+                const t = next.trim();
+                if (t === "") return saveProject({ currentBcr: null });
+                const num = Number(t);
+                if (!Number.isFinite(num) || num < 0) {
+                  toast.error("建蔽率は 0 以上の数値で入力してください");
+                  return false;
+                }
+                return saveProject({ currentBcr: num });
+              }}
+            />
 
             <label className={fieldLabel}>現況容積率</label>
             <InlineTextField
@@ -318,6 +345,7 @@ export function ProjectEditClient({
         keepOpenAfterPick
         onPick={addParcel}
       />
-    </main>
+      </main>
+    </div>
   );
 }

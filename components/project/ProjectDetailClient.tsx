@@ -5,8 +5,16 @@ import dynamic from "next/dynamic";
 import { KouzuView } from "@/components/kouzu/KouzuView";
 import { VisitAddForm } from "@/components/project/VisitAddForm";
 import { useProjects } from "@/hooks/use-projects";
-import { STATUS_DEFS, formatOwners, fmtDateTime, fmtDateOnly, fmtTsubo } from "@/lib/format";
-import type { Project, Visit } from "@/lib/types";
+import {
+  STATUS_DEFS,
+  formatBuilding,
+  formatMortgage,
+  formatRegistration,
+  fmtDateTime,
+  fmtDateOnly,
+  fmtTsubo,
+} from "@/lib/format";
+import type { Project, Visit, Owner, Mortgage } from "@/lib/types";
 
 const ProjectAreaMap = dynamic(() => import("@/components/map/ProjectAreaMap"), {
   ssr: false,
@@ -19,6 +27,39 @@ const PRINCIPAL_LABELS: Record<string, string> = {
   other: "その他",
 };
 const dash = (s: string) => s || "—";
+
+/** 地権者の表示（氏名・持分 + 住所・登記原因の 2 行構成）。 */
+function OwnerList({ owners }: { owners: Owner[] | undefined }) {
+  if (!owners || owners.length === 0) return <div>—</div>;
+  return (
+    <div className="space-y-1">
+      {owners.map((o, i) => {
+        const sub = [o.address, formatRegistration(o)].filter(Boolean).join("／");
+        return (
+          <div key={`${o.name}-${i}`}>
+            <div>{o.share ? `${o.name}（持分${o.share}）` : o.name}</div>
+            {sub && <div className="text-[10px] leading-snug text-[#94a3b8]">{sub}</div>}
+            {o.description && (
+              <div className="text-[10px] leading-snug text-[#94a3b8]">備考：{o.description}</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 抵当権の表示（1 件 1 行）。 */
+function MortgageList({ mortgages }: { mortgages: Mortgage[] | undefined }) {
+  if (!mortgages || mortgages.length === 0) return <div>—</div>;
+  return (
+    <div className="space-y-0.5">
+      {mortgages.map((m, i) => (
+        <div key={i}>{formatMortgage(m) || "—"}</div>
+      ))}
+    </div>
+  );
+}
 
 function VisitItem({ v }: { v: Visit }) {
   const item = (k: string, val: string) =>
@@ -110,10 +151,14 @@ export function ProjectDetailClient({
                   {(STATUS_DEFS[selectedLand.status] ?? STATUS_DEFS.target).label}
                 </span>
               </div>
-              <div className="text-[11px] text-[#64748b]">地権者</div>
-              <div>{formatOwners(selectedLand.owners) || "—"}</div>
-              <div className="text-[11px] text-[#64748b]">坪数</div>
-              <div>{fmtTsubo(selectedLand.areaTsubo)} 坪</div>
+              <div className="text-[11px] text-[#64748b]">土地の地権者</div>
+              <OwnerList owners={selectedLand.owners} />
+              <div className="text-[11px] text-[#64748b]">抵当権</div>
+              <MortgageList mortgages={selectedLand.mortgages} />
+              <div className="text-[11px] text-[#64748b]">面積</div>
+              <div>
+                {selectedLand.areaM2 != null ? `${selectedLand.areaM2} ㎡（${fmtTsubo(selectedLand.areaTsubo)} 坪）` : `${fmtTsubo(selectedLand.areaTsubo)} 坪`}
+              </div>
               <div className="text-[11px] text-[#64748b]">概要</div>
               <div>{selectedLand.description || "—"}</div>
               <div className="text-[11px] text-[#64748b]">登録日</div>
@@ -121,6 +166,44 @@ export function ProjectDetailClient({
               <div className="text-[11px] text-[#64748b]">更新日</div>
               <div>{dash(fmtDateTime(selectedLand.updatedAt ?? selectedLand.createdAt))}</div>
             </div>
+
+            <h5 className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
+              建物（{(selectedLand.buildings ?? []).length}）
+            </h5>
+            {(selectedLand.buildings ?? []).length === 0 ? (
+              <div className="p-2 text-center text-xs text-[#94a3b8]">建物なし（更地）</div>
+            ) : (
+              <div className="space-y-1.5">
+                {(selectedLand.buildings ?? []).map((b) => (
+                  <div key={b.id} className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-2">
+                    <div className="text-[12px] font-medium text-[#1e293b]">
+                      {b.kaokuNumber || "（家屋番号未設定）"}
+                    </div>
+                    {formatBuilding(b) && (
+                      <div className="mt-0.5 text-[11px] text-[#64748b]">{formatBuilding(b)}</div>
+                    )}
+                    {b.builtDate && (
+                      <div className="mt-0.5 text-[11px] text-[#64748b]">
+                        {fmtDateOnly(b.builtDate)}新築
+                      </div>
+                    )}
+                    <div className="mt-1 text-[11px]">
+                      <div className="text-[#64748b]">建物の地権者：</div>
+                      <OwnerList owners={b.owners} />
+                    </div>
+                    {(b.mortgages ?? []).length > 0 && (
+                      <div className="mt-1 text-[11px]">
+                        <div className="text-[#64748b]">抵当権：</div>
+                        <MortgageList mortgages={b.mortgages} />
+                      </div>
+                    )}
+                    {b.description && (
+                      <div className="mt-1 text-[11px] text-[#64748b]">備考：{b.description}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <h5 className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
               訪問記録（{(selectedLand.visits ?? []).length}件）

@@ -3,9 +3,13 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { InlineTextField } from "@/components/InlineTextField";
+import { BuildingsEditor } from "@/components/project/BuildingsEditor";
+import { OwnersEditor } from "@/components/project/OwnersEditor";
+import { MortgagesEditor } from "@/components/project/MortgagesEditor";
 import { ParcelPickerDialog } from "@/components/project/ParcelPickerDialog";
 import { useProjectMutations } from "@/hooks/use-projects";
-import { STATUS_DEFS, STATUS_KEYS, formatOwners, parseOwners, fmtDateTime, fmtDateOnly, fmtTsubo } from "@/lib/format";
+import { STATUS_DEFS, STATUS_KEYS, fmtDateTime, fmtDateOnly, fmtTsubo } from "@/lib/format";
+import { m2ToTsubo } from "@/lib/geo";
 import type { Project, Land } from "@/lib/types";
 
 const dash = (s: string) => s || "—";
@@ -84,29 +88,21 @@ export function LandDetailPanel({
           </button>
         </div>
 
-        <label className={labelCls}>地権者</label>
-        <InlineTextField
-          type="input"
-          placeholder="例：田中一郎、または 中嶋幸子（持分1/2）・中嶋直美（持分1/2）"
-          value={formatOwners(land.owners)}
-          onConfirm={(next) => save({ owners: parseOwners(next) })}
-        />
-
-        <label className={labelCls}>坪数</label>
+        <label className={labelCls}>面積</label>
         <InlineTextField
           type="number"
-          placeholder="例：45"
-          value={land.areaTsubo}
-          formatDisplay={(v) => `${fmtTsubo(v)} 坪`}
+          placeholder="例：267.86（㎡・登記簿の地積）"
+          value={land.areaM2}
+          formatDisplay={(v) => `${v} ㎡（${fmtTsubo(m2ToTsubo(Number(v)))} 坪）`}
           onConfirm={(next) => {
             const t = next.trim();
-            if (t === "") return save({ areaTsubo: 0 });
+            if (t === "") return save({ areaM2: 0 });
             const num = Number(t);
             if (!Number.isFinite(num) || num < 0) {
-              toast.error("坪数は 0 以上の数値で入力してください");
+              toast.error("面積は 0 以上の数値（㎡）で入力してください");
               return false;
             }
-            return save({ areaTsubo: num });
+            return save({ areaM2: num });
           }}
         />
 
@@ -124,6 +120,22 @@ export function LandDetailPanel({
         <label className={labelCls}>更新日</label>
         <div className="text-sm">{dash(fmtDateTime(land.updatedAt ?? land.createdAt))}</div>
       </div>
+
+      <OwnersEditor
+        title="土地の地権者"
+        owners={land.owners}
+        onChange={(owners) => save({ owners })}
+      />
+      <MortgagesEditor
+        title="抵当権（土地）"
+        mortgages={land.mortgages ?? []}
+        onChange={(mortgages) => save({ mortgages })}
+      />
+
+      <BuildingsEditor
+        buildings={land.buildings ?? []}
+        onChange={(buildings) => save({ buildings })}
+      />
 
       <h4 className="mb-1.5 mt-3.5 text-[11px] font-semibold uppercase tracking-wide text-[#475569]">
         訪問記録 ({visits.length})
