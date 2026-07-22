@@ -6,19 +6,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 /**
- * 4 画面共通のトップバー（旧 topbar.css）。
- * 構造: h1（システム名リンク + 画面名 + DEMO バッジ）→ サンプルデータに戻す → 業務報告シート ↗
+ * 全画面共通のトップバー（旧 topbar.css）。
+ * 構造: h1（システム名リンク + 画面名 + DEMO バッジ）→ サンプルデータに戻す
  *
  * @param screen 画面名（「案件一覧」「案件編集」など）
- * @param showReport 業務報告シートへのリンクを出すか（report 画面では出さない）
  */
 export function Topbar({
   screen,
-  showReport = true,
   showReset = true,
 }: {
   screen: string;
-  showReport?: boolean;
   showReset?: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -79,17 +76,6 @@ export function Topbar({
         >
           {resetting ? "リセット中…" : "サンプルデータに戻す"}
         </button>
-      )}
-
-      {showReport && (
-        <Link
-          href="/report"
-          target="_blank"
-          rel="noopener"
-          className="rounded-md bg-white/[.08] px-3 py-1.5 text-xs text-[#c8e6f5] no-underline transition-colors hover:bg-white/[.18]"
-        >
-          業務報告シート ↗
-        </Link>
       )}
     </header>
   );

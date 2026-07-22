@@ -13,7 +13,7 @@ const KouzuMapViewer = dynamic(() => import("@/components/kouzu/KouzuMapViewer")
 export default function KouzuMapPage() {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <Topbar screen="登記所備付地図ビューア" showReport={false} showReset={false} />
+      <Topbar screen="登記所備付地図ビューア" showReset={false} />
       <div className="flex min-h-0 flex-1">
         <KouzuMapViewer />
       </div>

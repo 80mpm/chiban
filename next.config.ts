@@ -12,7 +12,6 @@ const nextConfig: NextConfig = {
     "/api/**": ["./13106_2025.csv", "./kouzu_xml_data.js"],
     "/": ["./13106_2025.csv", "./kouzu_xml_data.js"],
     "/projects/**": ["./13106_2025.csv", "./kouzu_xml_data.js"],
-    "/report": ["./13106_2025.csv", "./kouzu_xml_data.js"],
   },
 };
 
