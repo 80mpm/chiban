@@ -4,8 +4,15 @@
 // ユーザーID/パスワードで認証サーバにログインして認証情報（aid/kid/lmtinf）を取得し、
 // WMTS GetTile(REST 方式) にクエリパラメータ（zis_*）として付与してタイルを取得する。
 // セッションはプロセス内（globalThis）にキャッシュし、期限切れ・認証エラー時に再ログインする。
-// 認証情報は仕様上ファイル/DB へ永続化しない。
+//
+// ZENRIN の同時ログイン数は 1。Vercel 等のサーバーレスでは関数インスタンスが並行起動し、
+// インスタンスごとにログインすると 10120004（同時ログイン数エラー）で衝突するため、
+// セッション（aid/kid/機能情報）は PostgreSQL の zenrin_session テーブルで全インスタンス共有し、
+// ログインは advisory lock で全体 1 回に直列化する。DB 不通時はプロセス内ログインへ
+// フォールバックする（ローカル単一プロセスでは従来どおり動く）。
 // ============================================================
+
+import { sql } from "./db/client";
 
 const ZENRIN_LAYER = process.env.ZENRIN_LAYER ?? "default"; // ラスター配信用マップタイプ
 const ZENRIN_STYLE = process.env.ZENRIN_STYLE ?? "default"; // default | highres
@@ -48,7 +55,36 @@ interface SessionState {
 const globalForZenrin = globalThis as unknown as {
   __zenrinSession?: SessionState;
   __zenrinLoginInflight?: Promise<SessionState>;
+  __zenrinTablePromise?: Promise<void>;
 };
+
+// セッション共有テーブル。タイル中継は ensureDbReady() を通らないため、
+// スキーマはここで自前に用意する（冪等）。
+const SESSION_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS zenrin_session (
+    id         integer PRIMARY KEY,
+    aid        text NOT NULL,
+    kid        text NOT NULL,
+    funcs      jsonb NOT NULL,
+    expires_at timestamptz NOT NULL
+  )
+`;
+
+// pg_advisory_xact_lock のキー（アプリ内で一意ならよい任意の整数）
+const SESSION_LOCK_KEY = 782344001;
+
+function ensureSessionTable(): Promise<void> {
+  if (!globalForZenrin.__zenrinTablePromise) {
+    globalForZenrin.__zenrinTablePromise = sql.unsafe(SESSION_TABLE_SQL).simple().then(
+      () => undefined,
+      (e) => {
+        globalForZenrin.__zenrinTablePromise = undefined;
+        throw e;
+      },
+    );
+  }
+  return globalForZenrin.__zenrinTablePromise;
+}
 
 /** 指定機能の zis_lmtinf（"areaCode,funcInfo"）を組み立てる。未契約なら null。 */
 function lmtinfFor(session: SessionState, id: string, subid: string): string | null {
@@ -119,19 +155,79 @@ async function logout(aid: string): Promise<void> {
   }
 }
 
-/** セッションを期限内キャッシュする。同時リクエストでは 1 回のログインに集約する。 */
-async function getSession(): Promise<SessionState> {
+/**
+ * DB のセッション共有テーブル経由でセッションを取得する。
+ * advisory lock（トランザクションスコープ）でログインを全インスタンス 1 回に直列化し、
+ * ロック取得後に再チェックして、他インスタンスが張った有効セッションがあればそれを使う。
+ * staleAid は 401/403 を返した無効セッション（これと同じ aid は再利用しない）。
+ */
+async function acquireSessionViaDb(staleAid?: string): Promise<SessionState> {
+  await ensureSessionTable();
+  return sql.begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(${SESSION_LOCK_KEY})`;
+    const rows = await tx<
+      { aid: string; kid: string; funcs: LoginFunc[]; expires_at: Date }[]
+    >`SELECT aid, kid, funcs, expires_at FROM zenrin_session WHERE id = 1`;
+    if (rows.length > 0) {
+      const r = rows[0];
+      const expiresAt = new Date(r.expires_at).getTime();
+      if (Date.now() < expiresAt && Array.isArray(r.funcs) && r.aid !== staleAid) {
+        return { aid: r.aid, kid: r.kid, funcs: r.funcs, expiresAt };
+      }
+      // 期限切れ・無効化対象の旧セッションは「同時ログイン数エラー」回避のためログアウトする
+      await logout(r.aid);
+      await tx`DELETE FROM zenrin_session WHERE id = 1`;
+    }
+    const session = await login();
+    await tx`
+      INSERT INTO zenrin_session (id, aid, kid, funcs, expires_at)
+      VALUES (1, ${session.aid}, ${session.kid}, ${tx.json(session.funcs as never)},
+              ${new Date(session.expiresAt)})
+    `;
+    return session;
+  });
+}
+
+/** DB 不通時のフォールバック（従来のプロセス内ログイン）。 */
+async function acquireSessionInProcess(prevAid?: string): Promise<SessionState> {
+  if (prevAid) await logout(prevAid);
+  return login();
+}
+
+/**
+ * セッションを取得する。プロセス内キャッシュ → DB 共有テーブル → ログインの順。
+ * 同時リクエストでは 1 回の取得に集約する。staleAid を渡すと、その aid のセッションを
+ * 無効扱いにして張り直す（タイル取得が 401/403 を返したときに使う）。
+ */
+async function getSession(staleAid?: string): Promise<SessionState> {
   const cached = globalForZenrin.__zenrinSession;
   // 期限内かつ機能情報を持つ（＝新しい形の）セッションのみ再利用する。
   // 旧デプロイ/ホットリロード由来の古い形は無効扱いにして張り直す。
-  if (cached && Date.now() < cached.expiresAt && Array.isArray(cached.funcs)) return cached;
+  if (
+    cached &&
+    Date.now() < cached.expiresAt &&
+    Array.isArray(cached.funcs) &&
+    cached.aid !== staleAid
+  ) {
+    return cached;
+  }
+  if (staleAid && cached?.aid === staleAid) globalForZenrin.__zenrinSession = undefined;
 
   if (!globalForZenrin.__zenrinLoginInflight) {
-    const prevAid = cached?.aid;
+    const prevAid = staleAid ?? cached?.aid;
     globalForZenrin.__zenrinLoginInflight = (async () => {
-      // 期限切れの旧セッションは「同時ログイン数エラー」回避のためログアウトしておく。
-      if (prevAid) await logout(prevAid);
-      const session = await login();
+      let session: SessionState;
+      try {
+        session = await acquireSessionViaDb(staleAid);
+      } catch (e) {
+        // DB 不通（ローカルで docker 未起動等）や advisory lock 失敗時は従来動作へ
+        console.warn(
+          `ZENRIN セッション共有ストアが使えないためプロセス内ログインにフォールバックします: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+        session = await acquireSessionInProcess(prevAid);
+      }
       globalForZenrin.__zenrinSession = session;
       return session;
     })().finally(() => {
@@ -169,8 +265,7 @@ export async function fetchTile(z: string, x: string, y: string): Promise<Respon
   let res = await requestTile(session, z, x, y);
 
   if (res.status === 401 || res.status === 403) {
-    globalForZenrin.__zenrinSession = undefined;
-    session = await getSession();
+    session = await getSession(session.aid);
     res = await requestTile(session, z, x, y);
   }
   if (!res.ok) {
@@ -181,7 +276,8 @@ export async function fetchTile(z: string, x: string, y: string): Promise<Respon
     status: 200,
     headers: {
       "Content-Type": res.headers.get("Content-Type") ?? "image/png",
-      "Cache-Control": "public, max-age=86400",
+      // s-maxage で Vercel CDN にもキャッシュさせ、関数（＝ZENRIN への往復）を減らす
+      "Cache-Control": "public, max-age=86400, s-maxage=86400",
     },
   });
 }
@@ -247,8 +343,7 @@ export async function fetchYoutoWms(params: URLSearchParams): Promise<Response> 
   }
   let res = await fetch(url, { method: "GET" });
   if (res.status === 401 || res.status === 403) {
-    globalForZenrin.__zenrinSession = undefined;
-    session = await getSession();
+    session = await getSession(session.aid);
     url = build(session);
     if (url) res = await fetch(url, { method: "GET" });
   }
@@ -260,7 +355,7 @@ export async function fetchYoutoWms(params: URLSearchParams): Promise<Response> 
     status: 200,
     headers: {
       "Content-Type": res.headers.get("Content-Type") ?? "image/png",
-      "Cache-Control": "public, max-age=86400",
+      "Cache-Control": "public, max-age=86400, s-maxage=86400",
     },
   });
 }

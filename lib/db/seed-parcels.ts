@@ -15,7 +15,7 @@ import zlib from "node:zlib";
 import { Client } from "pg";
 import { from as copyFrom } from "pg-copy-streams";
 import type { Sql } from "postgres";
-import { DATABASE_URL } from "./client";
+import { DATABASE_URL, DB_SSL } from "./client";
 import type { GeoJsonPolygon } from "../geo";
 
 const PARCEL_SEED_PATH = path.join(process.cwd(), "kouzu_parcels_seed.json.gz");
@@ -117,7 +117,19 @@ export async function seedParcelsIfEmpty(sql: Sql): Promise<boolean> {
     );
   }
 
-  const client = new Client({ connectionString: DATABASE_URL });
+  // pg は connectionString 内の sslmode が明示的な ssl オプションより優先される
+  // （sslmode=require は verify-full 扱いになり独自 CA の Supabase 等で失敗する）ため、
+  // URL から sslmode を除去して ssl オプション側で制御する
+  let connectionString = DATABASE_URL;
+  if (DB_SSL !== false) {
+    const url = new URL(DATABASE_URL);
+    url.searchParams.delete("sslmode");
+    connectionString = url.toString();
+  }
+  const client = new Client({
+    connectionString,
+    ssl: DB_SSL === false ? undefined : DB_SSL,
+  });
   await client.connect();
   try {
     const stream = client.query(
