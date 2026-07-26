@@ -5,12 +5,12 @@
 // ============================================================
 
 import fs from "node:fs";
-import path from "node:path";
 import iconv from "iconv-lite";
 import { parse } from "csv-parse/sync";
 import type { Sql } from "postgres";
+import { seedDataPath } from "./data-files";
 
-const ADDRESS_CSV_PATH = path.join(process.cwd(), "13106_2025.csv");
+const ADDRESS_CSV_FILE = "13106_2025.csv";
 
 interface AddressRow {
   都道府県コード: string;
@@ -30,7 +30,7 @@ export async function seedAddressMasterIfEmpty(sql: Sql): Promise<boolean> {
   `;
   if (n > 0) return false;
 
-  const buf = fs.readFileSync(ADDRESS_CSV_PATH);
+  const buf = fs.readFileSync(seedDataPath(ADDRESS_CSV_FILE));
   const text = iconv.decode(buf, "Shift_JIS");
   const rows = parse(text, { columns: true, skip_empty_lines: true }) as AddressRow[];
 
@@ -70,7 +70,7 @@ export async function seedAddressMasterIfEmpty(sql: Sql): Promise<boolean> {
 
   console.log(
     `住所マスタを投入しました: ${prefIds.size} 都道府県・${muniIds.size} 市区町村・` +
-      `${rows.length} 地番区域（${path.basename(ADDRESS_CSV_PATH)}）`,
+      `${rows.length} 地番区域（${ADDRESS_CSV_FILE}）`,
   );
   return true;
 }

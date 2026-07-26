@@ -10,16 +10,16 @@
 // ============================================================
 
 import fs from "node:fs";
-import path from "node:path";
 import zlib from "node:zlib";
 import { Client } from "pg";
 import { from as copyFrom } from "pg-copy-streams";
 import type { Sql } from "postgres";
 import { DATABASE_URL, DB_SSL } from "./client";
+import { seedDataPath, seedDataPathIfExists } from "./data-files";
 import type { GeoJsonPolygon } from "../geo";
 
-const PARCEL_SEED_PATH = path.join(process.cwd(), "kouzu_parcels_seed.json.gz");
-const KOUZU_JS_PATH = path.join(process.cwd(), "kouzu_xml_data.js");
+const PARCEL_SEED_FILE = "kouzu_parcels_seed.json.gz";
+const KOUZU_JS_FILE = "kouzu_xml_data.js";
 
 interface SeedParcel {
   oaza: string;
@@ -55,7 +55,7 @@ function seedTownName(oaza: string, chome: string): string {
 
 /** kouzu_xml_data.js から GeoJSON features を取り出す（フォールバック用）。 */
 function loadKouzuFeatures(): { properties: Record<string, string>; geometry: GeoJsonPolygon }[] {
-  const src = fs.readFileSync(KOUZU_JS_PATH, "utf-8");
+  const src = fs.readFileSync(seedDataPath(KOUZU_JS_FILE), "utf-8");
   const m = src.match(/window\.KOUZU_XML_DATA\s*=\s*(\{[\s\S]*\});?\s*$/);
   if (!m) throw new Error("kouzu_xml_data.js から KOUZU_XML_DATA を抽出できません");
   return JSON.parse(m[1]).geojson.features;
@@ -63,11 +63,12 @@ function loadKouzuFeatures(): { properties: Record<string, string>; geometry: Ge
 
 /** 筆マスタのシード行を返す（gz があればそれを、なければ kouzu_xml_data.js）。 */
 function loadSeedParcels(): { parcels: SeedParcel[]; source: string } {
-  if (fs.existsSync(PARCEL_SEED_PATH)) {
+  const gzPath = seedDataPathIfExists(PARCEL_SEED_FILE);
+  if (gzPath) {
     const data = JSON.parse(
-      zlib.gunzipSync(fs.readFileSync(PARCEL_SEED_PATH)).toString("utf-8"),
+      zlib.gunzipSync(fs.readFileSync(gzPath)).toString("utf-8"),
     );
-    return { parcels: data.parcels, source: path.basename(PARCEL_SEED_PATH) };
+    return { parcels: data.parcels, source: PARCEL_SEED_FILE };
   }
   const parcels = loadKouzuFeatures().map((f) => ({
     oaza: f.properties.oaza ?? "",
@@ -75,7 +76,7 @@ function loadSeedParcels(): { parcels: SeedParcel[]; source: string } {
     chiban: f.properties.chiban,
     geometry: f.geometry,
   }));
-  return { parcels, source: path.basename(KOUZU_JS_PATH) };
+  return { parcels, source: KOUZU_JS_FILE };
 }
 
 /** COPY テキスト形式のフィールドをエスケープする（\\ \t \n \r）。 */
