@@ -92,9 +92,6 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
   const base = `/projects/${proj.id}/lands/${land.id}`;
   const def = STATUS_DEFS[land.status] ?? STATUS_DEFS.target;
   const buildings = land.buildings ?? [];
-  const visits = [...(land.visits ?? [])].sort(
-    (a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime(),
-  );
 
   return (
     <main className="mx-auto max-w-4xl space-y-4 p-6">
@@ -181,24 +178,6 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
                     <MortgagesList mortgages={b.mortgages} />
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <Card title={`訪問記録（${visits.length}）`}>
-        {visits.length === 0 ? (
-          <div className="text-xs text-muted-foreground">
-            まだ訪問記録がありません（訪問記録の入力は閲覧システムで行います）
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {visits.map((v) => (
-              <div key={v.id} className="rounded-md border border-[#fde68a] bg-[#fef9e7] px-2.5 py-2">
-                {v.user && <div className="text-[11px] font-semibold text-[#b45309]">{v.user}</div>}
-                <div className="mt-0.5 whitespace-pre-wrap break-words text-xs">{v.comment}</div>
-                <div className="mt-1 text-[10px] text-[#94a3b8]">{dash(fmtDateTime(v.date))}</div>
               </div>
             ))}
           </div>
