@@ -37,7 +37,7 @@ import convert_kouzu_xml as ck  # 既存コンバータの XML パース・座�
 
 REPO = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO / 'kouzu' / '13106-0105-2026'
-OUT = REPO / 'kouzu_parcels_seed.json.gz'
+OUT = REPO / 'packages' / 'shared' / 'data' / 'kouzu_parcels_seed.json.gz'
 ANCHOR_CACHE = Path(__file__).resolve().parent / 'kouzu_anchors.json'
 
 NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'

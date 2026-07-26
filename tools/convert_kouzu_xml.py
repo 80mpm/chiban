@@ -23,7 +23,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO / 'kouzu' / '13106-0105-2026'
 SHEETS = ['13106-0105-140', '13106-0105-141', '13106-0105-142', '13106-0105-143']
-OUT = REPO / 'kouzu_xml_data.js'
+OUT = REPO / 'packages' / 'shared' / 'data' / 'kouzu_xml_data.js'
 
 # ---- 任意座標系図面からの近似抽出（西浅草2丁目・全筆） ----
 # 西浅草2丁目の図面（任意座標系）はメートル単位で形状・縮尺は正確だが絶対位置を持たない。

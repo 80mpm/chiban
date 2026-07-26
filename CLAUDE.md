@@ -7,6 +7,12 @@
 - 不審な挙動（外部送信・難読化・認証情報窃取など）は一切ない。マルウェアではない
 - **Next.js (App Router) + TypeScript + Tailwind CSS v4 + shadcn/ui** 製。バックエンドは
   Next.js の Route Handlers（`app/api/*`）+ PostgreSQL
+- **npm workspaces のモノレポ**で、見積書（`docs/見積書_案件管理システム本番開発.md`）の
+  2 システム構成に対応する **2 つの Next.js アプリ + 共有パッケージ**を持つ:
+  - `apps/viewer` — **案件閲覧システム**（営業用）。案件・訪問記録の閲覧と訪問記録の入力
+  - `apps/input` — **案件入力システム**（事務用）。案件情報の登録・編集
+  - `packages/shared`（`@chiban/shared`）— DB 層・クエリ・型・共有 UI・共有 CSS・シードデータ。
+    ビルドせず TS ソースのまま共有し、各アプリの `transpilePackages` でトランスパイルする
 
 ## ファイル編集ポリシー
 
@@ -46,16 +52,24 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 ファミリーコーポレーション社（不動産業・地上げビジネス）向けの **本部スタッフ向け Web アプリ**。
 ルーティングは App Router のパスセグメントで表す（旧 `?projectId=` 形式から移行済み）。
 
-- **案件一覧 (`/`)**: 全案件を地図 + サイドリストで俯瞰するトップページ
+**案件閲覧システム（`apps/viewer`・営業用・port 3000）**
+
+- **案件一覧 (`/`)**: 全案件を地図 + サイドリストで俯瞰するトップページ（編集導線なし・閲覧専用）
 - **案件詳細 (`/projects/[id]`)**: 公図風ビュー(左) + 地図(右) の左右半々ビュー。
   左ペインは土地の polygon から自動生成した公図風 SVG（白地・北上・地番/地権者/坪数ラベル付き）、
   右ペインは ZENRIN 地図に**案件領域のみ**表示する（筆ポリゴンは地図に重ねない）。
-  公図風ビューの筆クリックで右ペインに土地の全項目・訪問記録一覧を全面表示する（**訪問記録の追加もここで行う**）。
-  上部「案件サマリー」帯の「案件編集」ボタンで `/projects/[id]/edit` へ移動できる
-- **案件編集 (`/projects/[id]/edit`)**: 案件・土地を CRUD し、ダッシュボードで進捗を確認する編集画面（デスクトップ最適化）
+  公図風ビューの筆クリックで右ペインに土地の全項目・訪問記録一覧を全面表示する（**訪問記録の追加もここで行う**。
+  閲覧システム唯一の書き込み機能）
 - **登記所備付地図ビューア (`/kouzu-map`)**: 独立したデモ画面。G空間情報センターの登記所備付地図データ
   （台東区・2026年版）のうち公共座標9系の図面を ZENRIN 地図に重ねる。図面ごとのレイヤー切替と筆クリックで登記属性を表示。
   `DataStore` を使わない閲覧専用画面で、データは `public/data/kouzu_xml_data.json` を fetch する
+
+**案件入力システム（`apps/input`・事務用・port 3001）**
+
+- **案件一覧 (`/`)**: 事務作業向けのテーブル一覧（案件名/住所/土地数/総坪数/取得状況/更新日時）。
+  「＋ 新規案件」で作成モーダルを開き、作成後は案件編集へ遷移。行クリックでも編集へ
+- **案件編集 (`/projects/[id]/edit`)**: 案件・土地を CRUD し、ダッシュボードで進捗を確認する編集画面（デスクトップ最適化）。
+  パンくずの「案件詳細」は `NEXT_PUBLIC_VIEWER_ORIGIN` を使った閲覧システムへの外部リンク（未設定時はリンクなし）
 
 データは **PostgreSQL** に正規化テーブルで永続化され、全画面が Next.js の `/api/*`（Route Handlers）を介して共有する。
 
@@ -64,26 +78,29 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 - 住所階層は住所マスタ 3 テーブル（prefectures / shikuchoson / chibankuiki）で持ち、
   筆は地番区域（大字町丁目）への参照 chibankuiki_id で所在を表す（投入元は `13106_2025.csv`）
 - 初回 DB アクセス時にスキーマ作成・住所マスタ投入・筆マスタ投入・サンプルデータ投入が冪等に走る
-  （`lib/db/init.ts` の `ensureDbReady()` を各 Route Handler 冒頭で await する）
+  （`packages/shared/lib/db/init.ts` の `ensureDbReady()` を各 Route Handler 冒頭で await する）
 
 ## 起動方法
 
 ```bash
-# 初回のみ: 依存インストール
+# 初回のみ: 依存インストール（リポジトリルートで 1 回。workspaces 全体に効く）
 npm install
 
-# PostgreSQL を起動（Docker。データは named volume に永続化される）
+# PostgreSQL を起動（Docker。両アプリ共用。データは named volume に永続化される）
 docker compose up -d
 
 # ZENRIN ログイン認証情報（USER_ID/PASSWORD/SERVICE_ID 等）・DATABASE_URL を
-# .env（または .env.local）に設定（.env.example を参照）。Next.js が自動で読み込む
+# 各アプリの .env.local に設定（apps/*/.env.example を参照）。Next.js が自動で読み込む。
+# apps/input には NEXT_PUBLIC_VIEWER_ORIGIN=http://localhost:3000 も設定する
 
-# 開発サーバ起動
-npm run dev
-# http://localhost:3000/ にアクセス
+# 開発サーバ起動（別ターミナルで並行起動できる）
+npm run dev:viewer   # 案件閲覧システム → http://localhost:3000/
+npm run dev:input    # 案件入力システム → http://localhost:3001/
 
 # 本番ビルド / 型チェック
-npm run build
+npm run build          # 両アプリ
+npm run build:viewer   # 個別
+npm run build:input
 ```
 
 ## タイルプロキシ（ZENRIN）
@@ -91,9 +108,9 @@ npm run build
 ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使う。ユーザーID/パスワードで
 認証サーバにログインして認証情報（`aid`/`kid` と機能制限情報 `lmtinf`）を取得し、WMTS GetTile に
 **クエリパラメータ `zis_*`** として付与してタイルを取得する。Route Handler
-`app/tile/[z]/[x]/[y]/route.ts` が橋渡しする:
+`app/tile/[z]/[x]/[y]/route.ts`（**両アプリが持つ**）が橋渡しする:
 
-- `lib/zenrin.ts` が `GET /api/auth/login`（`user_id`/`password`/`service_id`/`device_flag=1`）で
+- `packages/shared/lib/zenrin.ts` が `GET /api/auth/login`（`user_id`/`password`/`service_id`/`device_flag=1`）で
   ログインし、`aid`（認証承認ID）・`kid`（基盤認証ID）・wmts_tile（機能コード `0007/0008`）の
   `areaCode,funcInfo`（= `zis_lmtinf`）を取り出してセッションを `globalThis` にキャッシュする
 - タイル取得 URL は `https://<WMTSドメイン>/api/zips/general/wmts_tile/<layer>/<style>/
@@ -107,7 +124,8 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
   取得順はプロセス内キャッシュ → DB → ログインで、ログインは `pg_advisory_xact_lock` で全体 1 回に
   直列化し、ロック取得後に再チェックして他インスタンスのセッションを再利用する。DB 不通時は
   従来のプロセス内ログインへフォールバック。テーブルは `lib/zenrin.ts` が自前で
-  `CREATE TABLE IF NOT EXISTS` する（タイル中継は `ensureDbReady()` を通らないため）
+  `CREATE TABLE IF NOT EXISTS` する（タイル中継は `ensureDbReady()` を通らないため）。
+  **閲覧・入力の 2 アプリも同じ仕組みでセッションを共有する**ため、両アプリは必ず同一 DB を指すこと
 - セッションはログイン応答の `items.func[]` を丸ごと保持し、`lmtinfFor(session, id, subid)` で
   機能ごとの `zis_lmtinf`（`areaCode,funcInfo`）を引く（wmts_tile=0007/0008、用途地域=0003/0002）
 - タイル・用途地域 WMS のレスポンスは `Cache-Control: public, max-age=86400, s-maxage=86400` で
@@ -124,21 +142,36 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
 
 ### データ API 一覧（`app/api/*` の Route Handler）
 
+各アプリは自分の画面が使う API のみを持つ（他アプリの API は呼ばない）。
+
+**両アプリ共通**
+
+| メソッド・パス | 役割 |
+|---|---|
+| `GET /api/projects` | 全案件を lands・visits 込みのツリーで返す |
+| `POST /api/reset` | 案件・土地・訪問記録を破棄してサンプル再投入（筆マスタは残す） |
+| `GET /api/youto-wms` | 用途地域データ重畳 (ZENRIN `wms/youto`) の WMS GetMap 中継。Leaflet の WMS パラメータに `zis_*` 認証を付与して転送 |
+| `GET /tile/:z/:x/:y.png` | ZENRIN タイル中継 |
+
+**案件閲覧システム（apps/viewer）のみ**
+
+| メソッド・パス | 役割 |
+|---|---|
+| `POST /api/projects/:id/lands/:landId/visits` | 訪問記録追加（編集・削除 API は持たない）。閲覧システム唯一の書き込み |
+
+**案件入力システム（apps/input）のみ**
+
 | メソッド・パス | 役割 |
 |---|---|
 | `GET /api/parcel-towns` | 町名（地番区域名。例「西浅草二丁目」）一覧と筆数。プルダウンの第一段に使う |
 | `GET /api/parcels?town=町名` | 指定町名の筆一覧（parcelId・地番のみ）。`&geometry=1` で領域 `polygon[[lat,lng]]` 付き |
 | `GET /api/parcels` | 筆マスタ全件（GeoJSON・デバッグ用。アプリ本体は使わない） |
-| `GET /api/projects` | 全案件を lands・visits 込みのツリーで返す |
 | `POST /api/projects` | 案件作成 |
 | `PATCH /api/projects/:id` | 案件の部分更新（JSON に含めたキーのみ反映。null でクリア） |
 | `DELETE /api/projects/:id` | 案件削除（土地・訪問記録もカスケード削除） |
 | `POST /api/projects/:id/lands` | 土地追加（parcelId 必須。マスタ外 400・案件内重複 409） |
 | `PATCH /api/projects/:id/lands/:landId` | 土地の部分更新（parcelId 変更で町名・地番・領域・面積㎡を再導出） |
 | `DELETE /api/projects/:id/lands/:landId` | 土地削除 |
-| `POST /api/projects/:id/lands/:landId/visits` | 訪問記録追加（編集・削除 API は持たない） |
-| `POST /api/reset` | 案件・土地・訪問記録を破棄してサンプル再投入（筆マスタは残す） |
-| `GET /api/youto-wms` | 用途地域データ重畳 (ZENRIN `wms/youto`) の WMS GetMap 中継。Leaflet の WMS パラメータに `zis_*` 認証を付与して転送 |
 
 エラーは `lib/api-error.ts` の `ApiError(status, 日本語message)` を `withApi()` で
 `Response.json({error}, {status})` に変換する。DB 接続不能は 503、UNIQUE 違反は 409。
@@ -146,57 +179,83 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
 ## ファイル構成
 
 ```
-app/
-  layout.tsx                  # ルートレイアウト（Providers: TanStack Query + Sonner）
-  globals.css                 # Tailwind v4 @theme トークン + 公図/地図ラベルのスタイル
-  page.tsx                    # 案件一覧（Server Component。初期データをサーバ取得）
-  projects/[id]/page.tsx      # 案件詳細
-  projects/[id]/edit/page.tsx # 案件編集
-  kouzu-map/page.tsx          # 登記所備付地図ビューア（client page・DataStore 非依存）
-  api/                        # Route Handlers（parcel-towns / parcels / projects… / reset / youto-wms）
-  tile/[z]/[x]/[y]/route.ts   # ZENRIN タイル中継
-lib/
-  db/{client,schema,init,seed-address,seed-parcels,sample,ids}.ts  # PostgreSQL データレイヤー
-  queries/{projects,lands,visits,parcels,owners,serialize,helpers}.ts  # 読み書き + 導出ロジック
-  geo.ts                      # parcelRing / polygonAreaM2 / m2ToTsubo / convexHull
-  api-error.ts / request.ts   # withApi・ApiError / JSON ボディ読み取り
-  zenrin.ts                   # ログイン認証セッションキャッシュ + タイル取得
-  types.ts / format.ts        # 共有型 / 表示整形（formatOwners・STATUS_DEFS 等）
-  data-client.ts              # ブラウザ用 API クライアント（旧 data.js の API 部）
-  utils.ts                    # cn（shadcn）
-hooks/
-  use-projects.ts             # TanStack Query: 案件ツリー + CRUD mutation
-  use-parcels.ts              # 筆マスタ町名遅延キャッシュ（staleTime: Infinity）
-components/
-  Topbar.tsx / Providers.tsx
-  InlineTextField.tsx / InlineSelectField.tsx  # 鉛筆→✓/✕ のインライン編集
-  kouzu/{KouzuView.tsx,kouzu-geom.ts}          # 公図風 SVG（edit/detail 共用）
-  kouzu/KouzuMapViewer.tsx                       # 登記所備付地図ビューア
-  map/{LeafletMap,ProjectListMap,ProjectAreaMap,PolygonDrawMap}.tsx, road-width-arrows.ts
-  project/{ProjectListClient,ProjectDetailClient,ProjectEditClient,LandDetailPanel,
-           LandAddDialog,ProjectCreateDialog,VisitAddForm,SummaryBar,StatusBar}.tsx
-  ui/                         # shadcn 生成物（button/dialog/select/input/textarea/label）
-public/data/kouzu_xml_data.json  # kouzu-map 用筆データ（5図面・595筆。kouzu_xml_data.js から生成）
-13106_2025.csv              # 住所マスタシード（Shift-JIS・108町字）。lib/db/seed-address.ts が読む
-kouzu_parcels_seed.json.gz  # 筆マスタシード（全144図面・約5.1万筆。自動生成・git 管理外）
-kouzu_xml_data.js           # 筆マスタシードのフォールバック（gz が無い場合）兼 public JSON の生成元
-tools/                      # 地図XML → シード生成ツール（convert_kouzu_*.py）
-docker-compose.yml          # ローカル PostgreSQL（postgres:17）
-proxy.py / db.py            # 旧バニラ JS 時代の Python バックエンド。Next.js 移行で廃止済み（削除）
+package.json                  # npm workspaces ルート（dev:viewer / dev:input / build:* スクリプト）
+tsconfig.base.json            # 共通 compilerOptions（各アプリ・パッケージが extends する）
+docker-compose.yml            # ローカル PostgreSQL（postgres:17。両アプリ共用）
+tools/                        # 地図XML → シード生成ツール（convert_kouzu_*.py。出力先は packages/shared/data/）
+packages/shared/              # @chiban/shared — ビルドしない TS ソース共有（transpilePackages で読む）
+  data/
+    13106_2025.csv            # 住所マスタシード（Shift-JIS・108町字）。lib/db/seed-address.ts が読む
+    kouzu_xml_data.js         # 筆マスタシードのフォールバック（gz が無い場合）兼 public JSON の生成元
+    kouzu_parcels_seed.json.gz  # 筆マスタシード（全144図面・約5.1万筆。自動生成・git 管理外）
+  styles/shared.css           # Tailwind v4 @theme トークン + 公図/地図ラベルのスタイル（各アプリの globals.css が @import）
+  lib/
+    db/{client,schema,init,seed-address,seed-parcels,sample,ids,data-files}.ts  # PostgreSQL データレイヤー
+                              # data-files.ts = シードファイルの cwd 上方探索リゾルバ（seedDataPath）
+    queries/{projects,lands,visits,parcels,owners,buildings,mortgages,serialize,helpers}.ts  # 読み書き + 導出ロジック
+    geo.ts                    # parcelRing / polygonAreaM2 / m2ToTsubo / convexHull
+    api-error.ts / request.ts # withApi・ApiError / JSON ボディ読み取り
+    zenrin.ts                 # ログイン認証セッション（DB 共有）+ タイル取得
+    types.ts / format.ts      # 共有型 / 表示整形（formatOwners・STATUS_DEFS 等）
+    data-client.ts            # ブラウザ用 API クライアント（旧 data.js の API 部）
+    utils.ts                  # cn（shadcn）
+  hooks/
+    use-projects.ts           # TanStack Query: 案件ツリー + CRUD mutation
+    use-parcels.ts            # 筆マスタ町名遅延キャッシュ（staleTime: Infinity）
+  components/
+    Topbar.tsx                # 共通トップバー（appName prop でシステム名を切替）
+    Providers.tsx             # TanStack Query + Sonner
+    ui/                       # shadcn 生成物（button/dialog/select/input/textarea/label）
+    kouzu/{KouzuView.tsx,kouzu-geom.ts}  # 公図風 SVG（両アプリ共用）
+    map/{LeafletMap,ProjectAreaMap}.tsx, road-width-arrows.ts
+    project/StatusBar.tsx     # ステータス積み上げバー（両アプリ共用）
+apps/viewer/                  # 案件閲覧システム（営業用・port 3000）→ Vercel「chiban」
+  app/
+    layout.tsx / globals.css  # globals.css は @import tailwindcss + shared.css + @source の薄い入口
+    page.tsx                  # 案件一覧（地図 + サイドリスト。編集導線なし）
+    projects/[id]/page.tsx    # 案件詳細（訪問記録追加あり）
+    kouzu-map/page.tsx        # 登記所備付地図ビューア（client page）
+    api/                      # projects(GET) / projects/[id]/lands/[landId]/visits(POST) / reset / youto-wms
+    tile/[z]/[x]/[y]/route.ts # ZENRIN タイル中継
+  components/
+    kouzu/KouzuMapViewer.tsx
+    project/{ProjectListClient,ProjectListMap,ProjectDetailClient,SummaryBar,VisitAddForm}.tsx
+  public/data/kouzu_xml_data.json  # kouzu-map 用筆データ（5図面・595筆。kouzu_xml_data.js から生成）
+apps/input/                   # 案件入力システム（事務用・port 3001）→ Vercel「chiban-input」
+  app/
+    layout.tsx / globals.css
+    page.tsx                  # 案件一覧テーブル（＋新規案件）
+    projects/[id]/edit/page.tsx  # 案件編集
+    api/                      # projects(GET+POST) / projects/[id](PATCH/DELETE) / lands CRUD /
+                              # parcel-towns / parcels / reset / youto-wms
+    tile/[z]/[x]/[y]/route.ts # ZENRIN タイル中継
+  components/
+    InlineTextField.tsx / InlineSelectField.tsx  # 鉛筆→✓/✕ のインライン編集
+    map/PolygonDrawMap.tsx    # Leaflet.draw の領域描画
+    project/{ProjectListTable,ProjectEditClient,LandDetailPanel,OwnersEditor,BuildingsEditor,
+             MortgagesEditor,FrontRoadEditor,ParcelPickerDialog,ProjectCreateDialog}.tsx
 ```
 
 ## デプロイ（Vercel）
 
-バックエンドが Next.js Route Handlers + PostgreSQL になったため、Vercel へのデプロイは
-**マネージド Postgres（Neon / Vercel Postgres 等）を用意して `DATABASE_URL` を環境変数に
-設定すれば可能**。タイルプロキシ（`app/tile/...`）も ZENRIN 認証情報の環境変数で動く。
-初回アクセス時の `ensureDbReady()` でスキーマ作成・シード投入が走る（COPY による筆マスタ投入は
-Node ランタイムが必要なため、該当 Route Handler は `runtime = 'nodejs'`）。
+**Vercel は 2 プロジェクト構成**（モノレポの Root Directory 指定）:
 
-**Vercel ダッシュボードで設定する環境変数**:
+| Vercel プロジェクト | Root Directory | アプリ | ドメイン |
+|---|---|---|---|
+| `chiban` | `apps/viewer` | 案件閲覧システム | chiban.vercel.app |
+| `chiban-input` | `apps/input` | 案件入力システム | chiban-input.vercel.app |
+
+**マネージド Postgres を用意して `DATABASE_URL` を環境変数に設定すれば動く**（両プロジェクトで
+**必ず同一 DB** を指すこと。zenrin_session 共有の前提）。タイルプロキシも ZENRIN 認証情報の
+環境変数で動く。初回アクセス時の `ensureDbReady()` でスキーマ作成・シード投入が走る
+（COPY による筆マスタ投入は Node ランタイムが必要なため、該当 Route Handler は `runtime = 'nodejs'`）。
+デプロイはローカル CLI（`vercel deploy --prod`。git 連携なし）。
+
+**Vercel ダッシュボードで設定する環境変数**（両プロジェクト共通）:
 `DATABASE_URL` / `ZENRIN_USER_ID` / `ZENRIN_PASSWORD` / `ZENRIN_SERVICE_ID` /
 `ZENRIN_LOGIN_DOMAIN` / `ZENRIN_WMTS_DOMAIN` / `ZENRIN_LAYER` / `ZENRIN_STYLE`
-（任意: `ZENRIN_DEVICE_FLAG`〔既定 `1`〕 / `ZENRIN_SESSION_TTL_SEC`〔既定 `1500`〕）
+（任意: `ZENRIN_DEVICE_FLAG`〔既定 `1`〕 / `ZENRIN_SESSION_TTL_SEC`〔既定 `1500`〕）。
+`chiban-input` のみ追加で `NEXT_PUBLIC_VIEWER_ORIGIN`（= 閲覧システムの URL。パンくずリンク用）
 
 **本番（chiban.vercel.app）の実構成（2026-07 に構築済み）**:
 - DB は Vercel Marketplace の **Supabase** 連携。連携が注入するのは `DATABASE_URL` ではなく
@@ -206,8 +265,10 @@ Node ランタイムが必要なため、該当 Route Handler は `runtime = 'no
   （`DB_SSL`。ローカル Docker は SSL なしのため localhost 判定で無効化）
 - `pg`（筆マスタ COPY 投入）は接続文字列の `sslmode=require` が明示 `ssl` オプションより
   優先されるため、URL から `sslmode` を除去してから接続する（`seed-parcels.ts`）
-- シード投入が読むリポジトリ直下の `13106_2025.csv` / `kouzu_xml_data.js` は
-  `next.config.ts` の `outputFileTracingIncludes` で関数バンドルへ明示同梱する
+- シード投入が読む `packages/shared/data/` の 3 ファイルは各アプリ `next.config.ts` の
+  `outputFileTracingIncludes`（`../../packages/shared/data/*`）で関数バンドルへ明示同梱する。
+  パス解決は `lib/db/data-files.ts` の `seedDataPath()`（cwd からの上方探索）が担い、
+  ローカル・Vercel（Root Directory 指定）どちらの cwd でも壊れない
 - `vercel deploy --prod`（CLI・ローカルから）でデプロイすると git 管理外の
   `kouzu_parcels_seed.json.gz` も同梱され、全 51,114 筆が投入される。git 連携デプロイでは
   gz が無いためフォールバック（595筆）になる点に注意（初回シード時のみ影響）
@@ -223,24 +284,30 @@ Node ランタイムが必要なため、該当 Route Handler は `runtime = 'no
 
 ### ヘッダー（トップバー）
 
-全画面共通の `components/Topbar.tsx`。構造は `h1（システム名リンク → 画面名 → DEMO バッジ）→
-サンプルデータに戻す`。
+全画面共通の `packages/shared/components/Topbar.tsx`。構造は `h1（システム名リンク → 画面名 →
+DEMO バッジ）→ サンプルデータに戻す`。システム名は `appName` prop（viewer=「案件管理システム」、
+input=「案件入力システム」）。
 
 | 画面 | サンプルデータに戻す |
 |---|---|
-| `/`（案件一覧） | ✓ |
-| `/projects/[id]`（案件詳細） | ✓ |
-| `/projects/[id]/edit`（案件編集） | ✓ |
-| `/kouzu-map`（登記所備付地図ビューア） | — |
+| viewer `/`（案件一覧） | ✓ |
+| viewer `/projects/[id]`（案件詳細） | ✓ |
+| viewer `/kouzu-map`（登記所備付地図ビューア） | — |
+| input `/`（案件一覧テーブル） | ✓ |
+| input `/projects/[id]/edit`（案件編集） | ✓ |
 
-**案件一覧**（地図 + サイドリストの 2 カラム）
+**案件一覧（viewer）**（地図 + サイドリストの 2 カラム）
 - 左に Leaflet 地図（ZENRIN タイル）、右にカード型のサイドリスト。地図には全案件の polygon を
   青破線 + 案件名ツールチップで表示。カード/ポリゴンクリックで案件詳細へ遷移
-- 「＋ 新規案件」ダイアログ（案件名・概要のみ）→ 作成後は `/projects/[id]/edit` へ自動遷移
 - 地図上の住所検索ボックス（Nominatim ジオコーディングで地図移動）
+- 編集導線は持たない（案件の作成・編集は入力システムで行う）
 
-**案件編集**（インライン編集 + 自動保存）
-- パンくず: `案件一覧 › 案件詳細 › 案件編集 › 案件名`
+**案件一覧（input）**（テーブル）
+- 案件名/住所/土地数/総坪数/取得状況/更新日時 の一覧。行クリックまたは「編集」で案件編集へ
+- 「＋ 新規案件」ダイアログ（案件名・概要のみ）→ 作成後は `/projects/[id]/edit` へ自動遷移
+
+**案件編集（input）**（インライン編集 + 自動保存）
+- パンくず: `案件一覧 › 案件詳細（閲覧システムへの外部リンク） › 案件編集 › 案件名`
 - 上段 2 カラム（左=領域マップ / 右=案件情報。最上部に取得状況バー）→ 土地（左右半分）→ 削除ボタン
 - 案件情報の各フィールドは **鉛筆 → ✓/✕** のインライン編集（`InlineTextField`）
 - 「領域マップ」は Leaflet.draw で描画 → 頂点ドラッグ。頂点数が変わると frontRoads をクリア
@@ -282,9 +349,9 @@ Node ランタイムが必要なため、該当 Route Handler は `runtime = 'no
 
 **① 辺の長さ（derived・保存しない）**
 - 領域ポリゴンの頂点（緯度経度）から毎回算出する各辺の実長。どこにも永続化しない
-- 算出・描画は `components/map/ProjectAreaMap.tsx`（Leaflet の `distanceTo()` → `.edge-length-label`）。
-  編集画面の一覧は `components/project/FrontRoadEditor.tsx` が同等の haversine で算出
-- 編集手段は値の直接入力ではなく、**案件編集画面の「領域マップ」で頂点をドラッグして形を変える**間接編集のみ（`components/map/PolygonDrawMap.tsx`、Leaflet.draw）
+- 算出・描画は `packages/shared/components/map/ProjectAreaMap.tsx`（Leaflet の `distanceTo()` → `.edge-length-label`）。
+  編集画面の一覧は `apps/input/components/project/FrontRoadEditor.tsx` が同等の haversine で算出
+- 編集手段は値の直接入力ではなく、**案件編集画面の「領域マップ」で頂点をドラッグして形を変える**間接編集のみ（`apps/input/components/map/PolygonDrawMap.tsx`、Leaflet.draw）
 
 **② 前面道路の幅員（`Project.frontRoads`・ユーザーデータ）**
 - 各辺に赤い矢印＋幅員ラベルで出る「前面道路の幅」。`frontRoads[{edgeIndex, width}]` で保持
@@ -292,12 +359,12 @@ Node ランタイムが必要なため、該当 Route Handler は `runtime = 'no
 - 保持: `projects.front_roads jsonb`（`lib/db/schema.ts`）。読み書きは `lib/queries/projects.ts`
   （`sql.json` で書き込み）/ `lib/queries/serialize.ts`（読み出しは転写のみ・導出なし）
 - 更新 API: `PATCH /api/projects/:id` に `frontRoads: [{edgeIndex, width}, …]` を渡す
-- 矢印・ラベル描画: `components/map/road-width-arrows.ts`（中点から幅員ぶん外向きに矢印、`${w.toFixed(1)} m`）
+- 矢印・ラベル描画: `packages/shared/components/map/road-width-arrows.ts`（中点から幅員ぶん外向きに矢印、`${w.toFixed(1)} m`）
 - **編集 UI**: 案件編集画面で、①辺番号バッジ／一覧で辺を選択 → ②領域マップに出る赤いハンドルを
   ドラッグして幅員を設定（0.1m 丸め）、または ③一覧（`FrontRoadEditor`）の数値入力で微調整。
   一覧には**設定済みの辺のみ**を表示し、各行の**ゴミ箱ボタンで削除**する（0/空は削除に使わない）
 - `edgeIndex` は頂点数に依存するため、**頂点数が変わると frontRoads はクリアする**
-  （`components/project/ProjectEditClient.tsx` の `handlePolygonChange`）
+  （`apps/input/components/project/ProjectEditClient.tsx` の `handlePolygonChange`）
 
 ### 距離・幅員の計算方式の決定（重要・方針）
 
