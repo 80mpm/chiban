@@ -78,7 +78,15 @@ export function OwnersEditor({
           placeholder="例：1/2（単独所有は空欄）"
           value={o.share}
           formatDisplay={(v) => `持分${v}`}
-          onConfirm={(next) => patch({ share: next.trim() })}
+          onConfirm={(next) => {
+            const t = next.trim().replace(/\s+/g, "");
+            // サーバは不正な持分を黙って「持分なし」に落とすため、入力時に弾いて気付けるようにする
+            if (t && !/^\d+\/[1-9]\d*$/.test(t)) {
+              toast.error("持分は「1/2」のような分数（分子/分母）で入力してください（単独所有は空欄）");
+              return false;
+            }
+            return patch({ share: t });
+          }}
         />
 
         <label className={labelCls}>住所</label>
