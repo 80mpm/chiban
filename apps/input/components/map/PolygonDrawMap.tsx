@@ -57,6 +57,8 @@ export default function PolygonDrawMap({
   selectedEdge = null,
   onSelectEdge,
   onCommitWidth,
+  onModeChange,
+  heightClassName = "h-[360px]",
 }: {
   initialPolygon: LatLng[] | null;
   onChange: (polygon: LatLng[] | null) => void;
@@ -68,6 +70,10 @@ export default function PolygonDrawMap({
   onSelectEdge?: (edgeIndex: number) => void;
   /** ハンドルのドラッグ確定時に、その辺の幅員（m）を保存する。 */
   onCommitWidth?: (edgeIndex: number, width: number) => void;
+  /** 描画モードの変化を通知する（描画中は保存を無効にする等、呼び出し側の制御用）。 */
+  onModeChange?: (mode: "empty" | "drawing" | "editing" | "set") => void;
+  /** 地図の高さ（Tailwind クラス。専用ページでは大きくする）。 */
+  heightClassName?: string;
 }) {
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -219,9 +225,12 @@ export default function PolygonDrawMap({
 
   const [mode, setMode] = useState<Mode>("empty");
   const modeRef = useRef<Mode>("empty");
+  const onModeChangeRef = useRef(onModeChange);
+  onModeChangeRef.current = onModeChange;
   const setModeBoth = (m: Mode) => {
     modeRef.current = m;
     setMode(m);
+    onModeChangeRef.current?.(m);
   };
 
   function getPolygonArray(): LatLng[] | null {
@@ -404,7 +413,7 @@ export default function PolygonDrawMap({
           )}
         </div>
       </div>
-      <div ref={elRef} className="h-[360px] w-full rounded-md border border-border" />
+      <div ref={elRef} className={`${heightClassName} w-full rounded-md border border-border`} />
     </>
   );
 }

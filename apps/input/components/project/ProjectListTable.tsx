@@ -1,14 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useProjects } from "@chiban/shared/hooks/use-projects";
 import { StatusBar } from "@chiban/shared/components/project/StatusBar";
 import { Button } from "@chiban/shared/components/ui/button";
 import { fmtTsubo, fmtDateTime } from "@chiban/shared/lib/format";
 import type { Project } from "@chiban/shared/lib/types";
-import { ProjectCreateDialog } from "@/components/project/ProjectCreateDialog";
 
 /** 案件の総坪数（土地の坪数の合計）。 */
 function totalTsubo(p: Project): number {
@@ -17,12 +14,13 @@ function totalTsubo(p: Project): number {
 
 /**
  * 事務向けの案件一覧テーブル（入力システムのトップ）。
- * 行クリック（または「編集」）で案件編集画面へ。「＋ 新規案件」で作成モーダルを開く。
+ * 行クリック（または「詳細」）で案件詳細へ。「＋ 新規案件」は作成ページへのリンク。
+ * データは Server Component から渡された initialProjects をそのまま描画する
+ * （保存はページ遷移 + refresh で反映されるため、クライアントキャッシュは持たない）。
  */
 export function ProjectListTable({ initialProjects }: { initialProjects: Project[] }) {
   const router = useRouter();
-  const { data: projects = [] } = useProjects(initialProjects);
-  const [createOpen, setCreateOpen] = useState(false);
+  const projects = initialProjects;
 
   return (
     <div className="min-h-0 overflow-y-auto bg-[color:var(--app-bg)] p-5">
@@ -31,8 +29,8 @@ export function ProjectListTable({ initialProjects }: { initialProjects: Project
           <p className="text-sm text-[color:var(--app-text-light)]">
             {projects.length} 件の案件
           </p>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            ＋ 新規案件
+          <Button size="sm" asChild>
+            <Link href="/projects/new">＋ 新規案件</Link>
           </Button>
         </div>
 
@@ -60,7 +58,7 @@ export function ProjectListTable({ initialProjects }: { initialProjects: Project
               {projects.map((p) => (
                 <tr
                   key={p.id}
-                  onClick={() => router.push(`/projects/${encodeURIComponent(p.id)}/edit`)}
+                  onClick={() => router.push(`/projects/${encodeURIComponent(p.id)}`)}
                   className="cursor-pointer border-b border-[color:var(--app-border)] last:border-b-0 hover:bg-[color:var(--app-bg)]"
                 >
                   <td className="px-4 py-2.5 font-medium">{p.name}</td>
@@ -79,11 +77,11 @@ export function ProjectListTable({ initialProjects }: { initialProjects: Project
                   </td>
                   <td className="px-4 py-2.5">
                     <Link
-                      href={`/projects/${encodeURIComponent(p.id)}/edit`}
+                      href={`/projects/${encodeURIComponent(p.id)}`}
                       onClick={(e) => e.stopPropagation()}
                       className="text-brand underline-offset-2 hover:underline"
                     >
-                      編集
+                      詳細
                     </Link>
                   </td>
                 </tr>
@@ -92,8 +90,6 @@ export function ProjectListTable({ initialProjects }: { initialProjects: Project
           </table>
         </div>
       </div>
-
-      <ProjectCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

@@ -24,6 +24,7 @@ const DRAG_THRESHOLD_PX = 4;
 export function KouzuView({
   lands,
   candidates = [],
+  selectedCandidateId = null,
   selectedLandId = null,
   onSelectLand,
   onCandidateClick,
@@ -38,6 +39,8 @@ export function KouzuView({
 }: {
   lands: Land[];
   candidates?: CandidateParcel[];
+  /** 選択中の候補筆（parcels.id）。青系ハイライトで示す（筆選択ページの「選択 → 確定」用）。 */
+  selectedCandidateId?: number | null;
   selectedLandId?: string | null;
   onSelectLand?: (landId: string) => void;
   onCandidateClick?: (parcel: CandidateParcel) => void;
@@ -204,7 +207,11 @@ export function KouzuView({
         return (
           <g key={`cand-${cand.parcelId}`}>
             <polygon
-              className="fude-candidate"
+              className={
+                cand.parcelId === selectedCandidateId
+                  ? "fude-candidate fude-candidate--selected"
+                  : "fude-candidate"
+              }
               points={pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ")}
               onClick={(e) => {
                 e.stopPropagation();

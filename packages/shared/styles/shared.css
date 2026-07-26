@@ -145,6 +145,13 @@ svg polygon.fude-candidate:hover {
   fill-opacity: 0.5;
   stroke-width: 2;
 }
+/* 筆選択ページで選択中の候補筆（クリック → 確定ボタンの間の状態） */
+svg polygon.fude-candidate--selected {
+  fill: #0e87c5;
+  fill-opacity: 0.45;
+  stroke: #065a82;
+  stroke-width: 2.5;
+}
 svg polygon.fude.selected {
   stroke-width: 3.5;
   fill-opacity: 0.65 !important;

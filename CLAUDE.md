@@ -66,10 +66,28 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 
 **案件入力システム（`apps/input`・事務用・port 3001）**
 
-- **案件一覧 (`/`)**: 事務作業向けのテーブル一覧（案件名/住所/土地数/総坪数/取得状況/更新日時）。
-  「＋ 新規案件」で作成モーダルを開き、作成後は案件編集へ遷移。行クリックでも編集へ
-- **案件編集 (`/projects/[id]/edit`)**: 案件・土地を CRUD し、ダッシュボードで進捗を確認する編集画面（デスクトップ最適化）。
-  パンくずの「案件詳細」は `NEXT_PUBLIC_VIEWER_ORIGIN` を使った閲覧システムへの外部リンク（未設定時はリンクなし）
+方針: **画面をリッチにするよりも RESTful に確実に動作させる**。リソース単位にページを分割した
+古典的 CRUD 構成（一覧 → 詳細 → 編集フォーム + 保存ボタン）で、項目ごとの自動保存
+（インライン編集）は廃止。地図・公図系のリッチ UI（領域描画・幅員ドラッグ・公図筆選択）は
+専用ページに隔離して機能維持している。
+
+| パス | 画面 |
+|---|---|
+| `/` | 案件一覧テーブル（行クリックで案件詳細へ。「＋ 新規案件」は作成ページへのリンク） |
+| `/projects/new` | 案件作成フォーム（案件名・概要のみ） |
+| `/projects/[id]` | **案件詳細ハブ**（読み取り専用。案件情報・領域マッププレビュー・公図+土地一覧テーブル・削除。`NEXT_PUBLIC_VIEWER_ORIGIN` があれば閲覧システムへの外部リンク） |
+| `/projects/[id]/edit` | 案件情報の編集フォーム（polygon/frontRoads は送らない） |
+| `/projects/[id]/map` | 領域マップ編集（ポリゴン描画 + 前面道路幅員を**ローカル state に溜め「保存」で一括 PATCH**。描画中は保存不可） |
+| `/projects/[id]/lands/new` | 土地追加＝筆選択（町名プルダウン + 公図ビュー。クリック=選択 → ボタンで確定。成功後は新しい土地詳細へ） |
+| `/projects/[id]/lands/[landId]` | 土地詳細（基本情報・地権者・抵当権・建物一覧・訪問記録〔読み取り専用〕・削除） |
+| `/projects/[id]/lands/[landId]/edit` | 土地編集フォーム（ステータス/面積/概要 + 地権者・抵当権の複数行フィールドセット。**buildings キーは送らない**） |
+| `/projects/[id]/lands/[landId]/parcel` | 筆の変更（筆選択ページの change モード） |
+| `/projects/[id]/lands/[landId]/buildings/new` | 建物追加フォーム |
+| `/projects/[id]/lands/[landId]/buildings/[buildingId]/edit` | 建物編集フォーム（削除もここ。土地の buildings 配列を再構築して PATCH。既存 id は再送で安定） |
+
+フォーム共通: `use-form-submit.ts`（保存成功 → トースト → 詳細へ push + router.refresh / 失敗 →
+フォーム上部の赤バナー）。削除は `ConfirmDeleteButton`（confirm → DELETE → トースト → 遷移）。
+input は案件データに TanStack Query を使わない（`use-parcels` の筆マスタキャッシュのみ使用）。
 
 データは **PostgreSQL** に正規化テーブルで永続化され、全画面が Next.js の `/api/*`（Route Handlers）を介して共有する。
 
@@ -222,18 +240,31 @@ apps/viewer/                  # 案件閲覧システム（営業用・port 3000
     project/{ProjectListClient,ProjectListMap,ProjectDetailClient,SummaryBar,VisitAddForm}.tsx
   public/data/kouzu_xml_data.json  # kouzu-map 用筆データ（5図面・595筆。kouzu_xml_data.js から生成）
 apps/input/                   # 案件入力システム（事務用・port 3001）→ Vercel「chiban-input」
-  app/
+  app/                        # リソース単位のページ分割（「案件概要」の表を参照）
     layout.tsx / globals.css
-    page.tsx                  # 案件一覧テーブル（＋新規案件）
-    projects/[id]/edit/page.tsx  # 案件編集
+    page.tsx                  # 案件一覧テーブル
+    projects/new/page.tsx     # 案件作成フォーム
+    projects/[id]/page.tsx    # 案件詳細ハブ（読み取り専用）
+    projects/[id]/edit/page.tsx  # 案件情報の編集フォーム
+    projects/[id]/map/page.tsx   # 領域マップ編集（描画 + 幅員。一括保存）
+    projects/[id]/lands/new/page.tsx           # 土地追加（筆選択）
+    projects/[id]/lands/[landId]/page.tsx      # 土地詳細
+    projects/[id]/lands/[landId]/edit/page.tsx # 土地編集フォーム
+    projects/[id]/lands/[landId]/parcel/page.tsx  # 筆の変更
+    projects/[id]/lands/[landId]/buildings/new/page.tsx          # 建物追加
+    projects/[id]/lands/[landId]/buildings/[buildingId]/edit/page.tsx  # 建物編集・削除
     api/                      # projects(GET+POST) / projects/[id](PATCH/DELETE) / lands CRUD /
                               # parcel-towns / parcels / reset / youto-wms
     tile/[z]/[x]/[y]/route.ts # ZENRIN タイル中継
   components/
-    InlineTextField.tsx / InlineSelectField.tsx  # 鉛筆→✓/✕ のインライン編集
-    map/PolygonDrawMap.tsx    # Leaflet.draw の領域描画
-    project/{ProjectListTable,ProjectEditClient,LandDetailPanel,OwnersEditor,BuildingsEditor,
-             MortgagesEditor,FrontRoadEditor,ParcelPickerDialog,ProjectCreateDialog}.tsx
+    PageHeader.tsx / ConfirmDeleteButton.tsx     # パンくず+タイトル / confirm付き削除ボタン
+    form/{use-form-submit.ts,FormActions.tsx}    # 保存フロー共通（トースト+遷移 / エラーバナー+保存/キャンセル）
+    project/{ProjectListTable,ProjectForm,ProjectDetailView}.tsx
+    map/{PolygonDrawMap,AreaMapEditClient}.tsx   # Leaflet.draw 描画 / 領域マップ編集ページ本体
+    parcel/ParcelPickerClient.tsx                # 筆選択ページ本体（追加/変更共用）
+    land/{LandDetailView,LandForm,OwnersFieldset,MortgagesFieldset}.tsx
+    project/FrontRoadEditor.tsx                  # 前面道路幅員の一覧編集（ローカル onChange）
+    building/BuildingForm.tsx
 ```
 
 ## デプロイ（Vercel）
@@ -293,8 +324,7 @@ input=「案件入力システム」）。
 | viewer `/`（案件一覧） | ✓ |
 | viewer `/projects/[id]`（案件詳細） | ✓ |
 | viewer `/kouzu-map`（登記所備付地図ビューア） | — |
-| input `/`（案件一覧テーブル） | ✓ |
-| input `/projects/[id]/edit`（案件編集） | ✓ |
+| input 全ページ | ✓ |
 
 **案件一覧（viewer）**（地図 + サイドリストの 2 カラム）
 - 左に Leaflet 地図（ZENRIN タイル）、右にカード型のサイドリスト。地図には全案件の polygon を
@@ -302,21 +332,17 @@ input=「案件入力システム」）。
 - 地図上の住所検索ボックス（Nominatim ジオコーディングで地図移動）
 - 編集導線は持たない（案件の作成・編集は入力システムで行う）
 
-**案件一覧（input）**（テーブル）
-- 案件名/住所/土地数/総坪数/取得状況/更新日時 の一覧。行クリックまたは「編集」で案件編集へ
-- 「＋ 新規案件」ダイアログ（案件名・概要のみ）→ 作成後は `/projects/[id]/edit` へ自動遷移
+**入力システムの各画面**は「案件概要」のページ表のとおり（リソース単位のページ分割・
+フォーム + 保存ボタン方式）。補足:
+- 案件詳細ハブの公図風ビューは筆クリックで土地詳細へ遷移するナビとして機能する
+- 領域マップ編集は変更をローカルに溜め「保存」で一括 PATCH。頂点数が変わると
+  frontRoads をローカルでクリアする（辺インデックスが無効になるため。従来仕様の維持）
+- 筆選択（土地追加・筆変更）は候補筆クリック=選択（青ハイライト）→ ボタンで確定の 2 段階。
+  追加済みの筆は候補から除外され、重複時はサーバの 409 がフォーム上部バナーに出る
+- 地権者・抵当権は独立ページを持たず、土地/建物フォーム内の複数行フィールドセットで編集する
+  （行 ID を持たない配列全置換 API と整合させるため）
 
-**案件編集（input）**（インライン編集 + 自動保存）
-- パンくず: `案件一覧 › 案件詳細（閲覧システムへの外部リンク） › 案件編集 › 案件名`
-- 上段 2 カラム（左=領域マップ / 右=案件情報。最上部に取得状況バー）→ 土地（左右半分）→ 削除ボタン
-- 案件情報の各フィールドは **鉛筆 → ✓/✕** のインライン編集（`InlineTextField`）
-- 「領域マップ」は Leaflet.draw で描画 → 頂点ドラッグ。頂点数が変わると frontRoads をクリア
-- 土地は **公図風ビュー（左）+ 選択中土地パネル（右）** で CRUD（土地一覧テーブルは持たない）。
-  パネルで地権者/面積㎡/備考/ステータスを編集、「筆を変更」で別の筆へ付け替え
-- 「＋ 土地を追加」は **ワイドモーダル**（町名プルダウン + 大きな公図ビュー）。候補筆をクリックで
-  その場追加（連続追加可・追加済みは候補から除外）
-
-**案件詳細** / **登記所備付地図ビューア** は「案件概要」記載のとおり。
+**案件詳細（viewer）** / **登記所備付地図ビューア** は「案件概要」記載のとおり。
 
 ## デモ用の前提（重要）
 
@@ -428,13 +454,16 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 
 ## 技術的な注意点
 
-- **データ取得**: 各 page.tsx（Server Component）が `lib/queries` を直接呼んで初期データを取得し、
-  クライアントへ渡す。対話的な CRUD は TanStack Query の mutation でサーバ応答を
-  キャッシュへ反映する（`hooks/use-projects.ts`。旧 `data.js` の「ローカル配列へ反映」と同型）
+- **データ取得**: 各 page.tsx（Server Component・`force-dynamic`）が `lib/queries` を直接呼んで
+  初期データを取得し、クライアントへ渡す。書き込み後の反映はアプリで方式が異なる:
+  - **input**: フォーム保存 → `lib/data-client` の素の fetch → 成功で詳細ページへ `router.push` +
+    `router.refresh()`（案件データに TanStack Query は使わない。キャッシュを持たないことが確実性の担保）
+  - **viewer**: 訪問記録追加のみ TanStack Query の mutation でキャッシュへ反映（`hooks/use-projects.ts`）
 - **筆マスタは町名単位の遅延取得**: 約 5.1 万筆を一括では読まない。`useParcelTowns()` /
-  `useParcelsByTown()` / `useParcelsByTownWithPolygons()` を `staleTime: Infinity` でキャッシュする。
+  `useParcelsByTown()` / `useParcelsByTownWithPolygons()` を `staleTime: Infinity` でキャッシュする
+  （input で唯一 TanStack Query を使う箇所）。
   土地の領域・面積・町名・地番はサーバが parcels から導出して返すため、クライアントは原則
-  筆のジオメトリを持たない（例外は土地追加モーダルの候補筆表示）
+  筆のジオメトリを持たない（例外は筆選択ページの候補筆表示）
 - **Leaflet は素のまま命令的に**使う（react-leaflet は不使用）。Leaflet.draw・常時ツールチップ・
   divIcon ラベル・道路幅員矢印・fitBounds が命令的なため。地図コンポーネントは `window` 前提なので
   `next/dynamic` の `ssr:false` で読み込む（`dynamic(..., {ssr:false})` は client component 内でのみ可）

@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { InlineTextField } from "@/components/InlineTextField";
+import { Input } from "@chiban/shared/components/ui/input";
 import { toast } from "sonner";
 import type { FrontRoad, LatLng } from "@chiban/shared/lib/types";
 
@@ -19,10 +20,44 @@ function edgeLengthMeters(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+/** 幅員の数値入力（Enter / フォーカス外れで確定）。 */
+function WidthField({
+  width,
+  onCommit,
+}: {
+  width: number | null;
+  onCommit: (raw: string) => void;
+}) {
+  const [text, setText] = useState(width != null ? String(width) : "");
+
+  return (
+    <Input
+      type="number"
+      min={0.1}
+      step={0.1}
+      placeholder="幅員（m）"
+      value={text}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => {
+        if (text !== (width != null ? String(width) : "")) onCommit(text);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      className="h-8 text-right text-sm"
+    />
+  );
+}
+
 /**
  * 案件領域ポリゴンの各辺に対する前面道路幅員の編集 UI。
- * 辺ごとに「辺長（自動算出）＋幅員（メートル）」を並べ、空で消去・正の数で設定する。
- * 確定すると frontRoads 全体を onChange で返す（呼び出し側が saveProject する）。
+ * 設定済みの辺だけを一覧し、幅員の数値微調整とゴミ箱での削除ができる。
+ * 変更は onChange で frontRoads 全体を返すだけ（保存は呼び出し側の責務。
+ * 領域マップ編集ページではローカル state に溜めて「保存」で一括 PATCH する）。
  */
 export function FrontRoadEditor({
   polygon,
@@ -35,7 +70,7 @@ export function FrontRoadEditor({
   frontRoads: FrontRoad[];
   selectedEdge: number | null;
   onSelectEdge: (edgeIndex: number) => void;
-  onChange: (frontRoads: FrontRoad[]) => Promise<boolean> | boolean;
+  onChange: (frontRoads: FrontRoad[]) => void;
 }) {
   const n = Array.isArray(polygon) ? polygon.length : 0;
 
@@ -49,22 +84,22 @@ export function FrontRoadEditor({
 
   const widthOf = (i: number) => frontRoads.find((r) => r.edgeIndex === i)?.width ?? null;
 
-  function commit(edgeIndex: number, raw: string): Promise<boolean> | boolean {
+  function commit(edgeIndex: number, raw: string) {
     const w = Number(raw.trim());
     if (!Number.isFinite(w) || w <= 0) {
       toast.error("幅員は 0 より大きい数値（メートル）で入力してください（削除は右のゴミ箱ボタン）");
-      return false;
+      return;
     }
     const others = frontRoads.filter((r) => r.edgeIndex !== edgeIndex);
-    const next = [...others, { edgeIndex, width: w }].sort((a, b) => a.edgeIndex - b.edgeIndex);
-    return onChange(next);
+    onChange([...others, { edgeIndex, width: w }].sort((a, b) => a.edgeIndex - b.edgeIndex));
   }
 
   function remove(edgeIndex: number) {
-    const next = frontRoads
-      .filter((r) => r.edgeIndex !== edgeIndex)
-      .sort((a, b) => a.edgeIndex - b.edgeIndex);
-    onChange(next);
+    onChange(
+      frontRoads
+        .filter((r) => r.edgeIndex !== edgeIndex)
+        .sort((a, b) => a.edgeIndex - b.edgeIndex),
+    );
   }
 
   // 前面道路が設定されている辺だけを表示する（未設定は出さない）。
@@ -87,7 +122,7 @@ export function FrontRoadEditor({
           const selected = i === selectedEdge;
           return (
             <div
-              key={i}
+              key={`${i}-${widthOf(i)}`}
               onClick={() => onSelectEdge(i)}
               className={`grid grid-cols-[auto_1fr_minmax(120px,150px)_auto] items-center gap-x-3 rounded-md border px-2.5 py-1.5 ${
                 selected ? "border-brand bg-[#eff6fb]" : "border-border bg-white"
@@ -101,13 +136,7 @@ export function FrontRoadEditor({
                 {i}
               </span>
               <span className="text-xs text-muted-foreground">辺 {i}・辺長 {len.toFixed(1)} m</span>
-              <InlineTextField
-                type="number"
-                placeholder="幅員（m）"
-                value={widthOf(i)}
-                formatDisplay={(v) => `${v} m`}
-                onConfirm={(next) => commit(i, next)}
-              />
+              <WidthField width={widthOf(i)} onCommit={(raw) => commit(i, raw)} />
               <button
                 type="button"
                 aria-label="削除"
