@@ -2,7 +2,7 @@
 // Leaflet の L.tileLayer.wms が付ける WMS 標準パラメータ（bbox/width/height/crs 等）を
 // そのまま引き継ぎ、ログイン認証の zis_* をサーバ側で付与して PNG を返す。
 
-import { fetchYoutoWms } from "@/lib/zenrin";
+import { fetchYoutoWms } from "@chiban/shared/lib/zenrin";
 
 // セッションキャッシュをプロセス内で保持したいので Node ランタイム。
 export const runtime = "nodejs";

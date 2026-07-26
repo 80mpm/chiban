@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { Project, LatLng } from "@/lib/types";
+import type { Project, LatLng } from "@chiban/shared/lib/types";
 
 const POLY_STYLE: L.PolylineOptions = {
   color: "#065a82",

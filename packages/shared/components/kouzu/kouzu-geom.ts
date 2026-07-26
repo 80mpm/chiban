@@ -4,8 +4,8 @@
 // 純関数なのでテスト容易。SVG 描画は KouzuView が担う。
 // ============================================================
 
-import { polygonAreaM2 } from "@/lib/geo";
-import type { LatLng } from "@/lib/types";
+import { polygonAreaM2 } from "@chiban/shared/lib/geo";
+import type { LatLng } from "@chiban/shared/lib/types";
 
 export interface KouzuLayout {
   viewW: number;

@@ -1,8 +1,8 @@
 // POST /api/projects/:id/lands/:landId/visits — 訪問記録追加（追加のみ）
 
-import { withApi, jsonOk } from "@/lib/api-error";
-import { readJsonBody } from "@/lib/request";
-import { addVisit } from "@/lib/queries/visits";
+import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
+import { readJsonBody } from "@chiban/shared/lib/request";
+import { addVisit } from "@chiban/shared/lib/queries/visits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

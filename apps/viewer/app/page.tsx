@@ -1,6 +1,6 @@
-import { Topbar } from "@/components/Topbar";
+import { Topbar } from "@chiban/shared/components/Topbar";
 import { ProjectListClient } from "@/components/project/ProjectListClient";
-import { getProjectsTree } from "@/lib/queries/projects";
+import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
 
 export const dynamic = "force-dynamic";
 

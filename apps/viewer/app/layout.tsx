@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Providers } from "@/components/Providers";
+import { Providers } from "@chiban/shared/components/Providers";
 
 export const metadata: Metadata = {
   title: "案件管理システム",

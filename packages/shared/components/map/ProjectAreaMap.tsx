@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { drawRoadWidthArrows } from "./road-width-arrows";
-import type { Project } from "@/lib/types";
+import type { Project } from "@chiban/shared/lib/types";
 
 /**
  * 用途地域の凡例（色 → 用途地域名）。

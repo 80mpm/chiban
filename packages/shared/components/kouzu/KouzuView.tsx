@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { STATUS_DEFS, fmtTsubo } from "@/lib/format";
-import type { Land, LatLng } from "@/lib/types";
+import { STATUS_DEFS, fmtTsubo } from "@chiban/shared/lib/format";
+import type { Land, LatLng } from "@chiban/shared/lib/types";
 import { computeKouzuLayout, centroid } from "./kouzu-geom";
 
 /** 候補筆（土地追加・筆変更モードでグレー表示する筆）。 */

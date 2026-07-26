@@ -1,8 +1,8 @@
 "use client";
 
-import { STATUS_DEFS } from "@/lib/format";
-import type { Land } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { STATUS_DEFS } from "@chiban/shared/lib/format";
+import type { Land } from "@chiban/shared/lib/types";
+import { cn } from "@chiban/shared/lib/utils";
 
 /**
  * 案件のステータス積み上げセグメントバー（旧 common.js renderStatusBar）。

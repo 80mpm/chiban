@@ -1,9 +1,9 @@
 // GET  /api/projects — 全案件を lands・visits 込みのツリーで返す
 // POST /api/projects — 案件作成
 
-import { withApi, jsonOk } from "@/lib/api-error";
-import { readJsonBody } from "@/lib/request";
-import { getProjectsTree, createProject } from "@/lib/queries/projects";
+import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
+import { readJsonBody } from "@chiban/shared/lib/request";
+import { getProjectsTree, createProject } from "@chiban/shared/lib/queries/projects";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

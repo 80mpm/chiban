@@ -2,7 +2,7 @@
 // Leaflet の L.tileLayer が叩く旧来の URL をそのまま動的ルートで受ける
 // （[y] は "25800.png" のように拡張子付きで届くので剥がす）。
 
-import { fetchTile } from "@/lib/zenrin";
+import { fetchTile } from "@chiban/shared/lib/zenrin";
 
 // トークンキャッシュをプロセス内で保持したいので Node ランタイム。
 export const runtime = "nodejs";

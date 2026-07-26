@@ -6,10 +6,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { KouzuView, type CandidateParcel } from "@/components/kouzu/KouzuView";
-import { useParcelTowns, useParcelsByTownWithPolygons } from "@/hooks/use-parcels";
-import type { Project } from "@/lib/types";
+} from "@chiban/shared/components/ui/dialog";
+import { KouzuView, type CandidateParcel } from "@chiban/shared/components/kouzu/KouzuView";
+import { useParcelTowns, useParcelsByTownWithPolygons } from "@chiban/shared/hooks/use-parcels";
+import type { Project } from "@chiban/shared/lib/types";
 
 /**
  * 公図ポリゴンから筆を選ぶワイドモーダル（土地追加・筆変更で共用）。

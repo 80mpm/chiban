@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import { InlineTextField } from "@/components/InlineTextField";
 import { OwnersEditor } from "@/components/project/OwnersEditor";
 import { MortgagesEditor } from "@/components/project/MortgagesEditor";
-import { fmtDateOnly } from "@/lib/format";
-import type { Building } from "@/lib/types";
+import { fmtDateOnly } from "@chiban/shared/lib/format";
+import type { Building } from "@chiban/shared/lib/types";
 
 /** 新規建物の空テンプレート（id はサーバが採番するため空）。 */
 function emptyBuilding(): Building {

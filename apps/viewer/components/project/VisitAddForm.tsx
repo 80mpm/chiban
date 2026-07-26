@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { useProjectMutations } from "@/hooks/use-projects";
+import { useProjectMutations } from "@chiban/shared/hooks/use-projects";
 
 const SELECT_CLS =
   "w-full rounded-md border border-input bg-white px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-[color:var(--ring)]";

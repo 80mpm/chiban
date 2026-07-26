@@ -1,0 +1,279 @@
+
+/* ============================================================
+   案件管理システム — デザイントークン
+   旧 style.css / topbar.css から抽出した色・余白・タイポを
+   Tailwind v4 の @theme に集約する。shadcn/ui 用の
+   セマンティックトークン（--background 等）も併設する。
+   ============================================================ */
+
+:root {
+  /* shadcn セマンティックトークン（light テーマ） */
+  --radius: 0.625rem;
+  --background: #ffffff;
+  --foreground: #1a2c3a;
+  --card: #ffffff;
+  --card-foreground: #1a2c3a;
+  --popover: #ffffff;
+  --popover-foreground: #1a2c3a;
+  --primary: #065a82;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1a2c3a;
+  --muted: #eef2f7;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #1a2c3a;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;
+  --input: #cbd5e1;
+  --ring: rgba(6, 90, 130, 0.35);
+
+  /* アプリ固有トークン */
+  --app-page-bg: #f4f8fb;
+  --app-surface: #f8fafc;
+  --app-text: #1a2c3a;
+  --app-text-dark: #21295c;
+  --app-text-muted: #64748b;
+  --app-text-light: #94a3b8;
+  --app-brand: #065a82;
+  --app-header: #21295c;
+  --app-badge: #06b6d4;
+  --app-status-target: #94a3b8;
+  --app-status-acquired: #10b981;
+  --app-arrow: #b91c1c;
+  --app-visit-bg: #fef9e7;
+  --app-visit-border: #fde68a;
+  --app-visit-user: #b45309;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* アプリ固有 */
+  --color-brand: var(--app-brand);
+  --color-header: var(--app-header);
+  --color-badge: var(--app-badge);
+  --color-status-target: var(--app-status-target);
+  --color-status-acquired: var(--app-status-acquired);
+  --color-arrow: var(--app-arrow);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+    "Yu Gothic UI", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--app-page-bg);
+  color: var(--app-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   公図風 SVG（KouzuView）— 旧 style.css .kouzu-host 周辺の移植
+   ============================================================ */
+.kouzu-host {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  overflow: hidden;
+}
+.kouzu-host svg {
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  max-width: 100%;
+  max-height: 100%;
+}
+svg polygon.fude {
+  cursor: pointer;
+  transition: fill-opacity 0.12s;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.2;
+}
+svg polygon.fude:hover {
+  fill-opacity: 0.65 !important;
+}
+svg polygon.fude-candidate {
+  fill: #94a3b8;
+  fill-opacity: 0.18;
+  stroke: #94a3b8;
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  transition: fill-opacity 0.12s;
+}
+svg polygon.fude-candidate:hover {
+  fill-opacity: 0.5;
+  stroke-width: 2;
+}
+svg polygon.fude.selected {
+  stroke-width: 3.5;
+  fill-opacity: 0.65 !important;
+}
+svg .fude-label {
+  font-weight: 700;
+  font-family: var(--font-sans);
+  fill: #1e293b;
+  paint-order: stroke fill;
+  stroke: #fff;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+}
+svg .north-mark {
+  fill: #94a3b8;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 案件一覧の地図ラベル（常時表示ツールチップ） */
+.leaflet-tooltip.list-map-label {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #1e293b;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+}
+.leaflet-tooltip.list-map-label::before {
+  display: none;
+}
+
+/* 登記所備付地図ビューアの地番ラベル（ポリゴン中心の常時ツールチップ） */
+.leaflet-tooltip.map-label {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.leaflet-tooltip.map-label::before {
+  display: none;
+}
+.leaflet-tooltip.map-label.label-chiban {
+  font-weight: 700;
+  font-size: 10px;
+  text-shadow:
+    0 0 2px #fff,
+    0 0 2px #fff,
+    0 0 2px #fff,
+    0 0 2px #fff;
+}
+
+/* 案件詳細の地図ラベル（辺長 / 前面道路幅員）— divIcon に注入する HTML 用 */
+.edge-length-label {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #065a82;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transform: translate(-50%, -50%);
+  display: inline-block;
+  line-height: 1;
+  pointer-events: none;
+}
+.road-width-label {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #b91c1c;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #b91c1c;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  transform: translate(-50%, -50%);
+  display: inline-block;
+  line-height: 1;
+  pointer-events: none;
+}
+/* 領域マップの辺番号バッジ（前面道路幅員エディタと連動・クリックで選択）。
+   位置決めは Leaflet の iconSize/iconAnchor に任せ、ここでは中身を中央寄せするだけ。 */
+.edge-index-badge {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 1.5px solid #065a82;
+  color: #065a82;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  /* 字形メトリクスの上寄りを相殺して光学的中心に合わせる微調整 */
+  padding-top: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+.edge-index-badge--selected {
+  background: #065a82;
+  border-color: #065a82;
+  color: #ffffff;
+}
+/* 前面道路幅員のドラッグハンドル（選択辺の道路側に出る掴み丸）*/
+.road-width-handle {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #b91c1c;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+}
+.road-width-handle:active {
+  cursor: grabbing;
+}
+.leaflet-marker-draggable.leaflet-drag-target .road-width-handle {
+  cursor: grabbing;
+}

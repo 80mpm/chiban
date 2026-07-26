@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { InlineTextField } from "@/components/InlineTextField";
-import { fmtDateOnly } from "@/lib/format";
-import type { Mortgage } from "@/lib/types";
+import { fmtDateOnly } from "@chiban/shared/lib/format";
+import type { Mortgage } from "@chiban/shared/lib/types";
 
 function emptyMortgage(): Mortgage {
   return { date: "", amount: null, holder: "" };

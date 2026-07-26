@@ -1,9 +1,9 @@
 // PATCH  /api/projects/:id — 案件の部分更新
 // DELETE /api/projects/:id — 案件削除（土地・訪問記録もカスケード）
 
-import { withApi, jsonOk } from "@/lib/api-error";
-import { readJsonBody } from "@/lib/request";
-import { updateProject, deleteProject } from "@/lib/queries/projects";
+import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
+import { readJsonBody } from "@chiban/shared/lib/request";
+import { updateProject, deleteProject } from "@chiban/shared/lib/queries/projects";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

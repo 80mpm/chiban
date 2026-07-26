@@ -3,7 +3,7 @@
 import { Trash2 } from "lucide-react";
 import { InlineTextField } from "@/components/InlineTextField";
 import { toast } from "sonner";
-import type { FrontRoad, LatLng } from "@/lib/types";
+import type { FrontRoad, LatLng } from "@chiban/shared/lib/types";
 
 /** 2 点間の距離（メートル）。Leaflet の distanceTo と同じ haversine。 */
 function edgeLengthMeters(a: LatLng, b: LatLng): number {

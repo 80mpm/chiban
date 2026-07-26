@@ -6,14 +6,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { InlineTextField } from "@/components/InlineTextField";
-import { KouzuView } from "@/components/kouzu/KouzuView";
-import { StatusBar } from "@/components/project/StatusBar";
+import { KouzuView } from "@chiban/shared/components/kouzu/KouzuView";
+import { StatusBar } from "@chiban/shared/components/project/StatusBar";
 import { LandDetailPanel } from "@/components/project/LandDetailPanel";
 import { FrontRoadEditor } from "@/components/project/FrontRoadEditor";
 import { ParcelPickerDialog } from "@/components/project/ParcelPickerDialog";
-import { useProjects, useProjectMutations } from "@/hooks/use-projects";
-import { fmtDateTime, fmtTsubo } from "@/lib/format";
-import type { FrontRoad, Project, LatLng } from "@/lib/types";
+import { useProjects, useProjectMutations } from "@chiban/shared/hooks/use-projects";
+import { fmtDateTime, fmtTsubo } from "@chiban/shared/lib/format";
+import type { FrontRoad, Project, LatLng } from "@chiban/shared/lib/types";
 
 const PolygonDrawMap = dynamic(() => import("@/components/map/PolygonDrawMap"), {
   ssr: false,

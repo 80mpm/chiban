@@ -7,10 +7,10 @@ import { BuildingsEditor } from "@/components/project/BuildingsEditor";
 import { OwnersEditor } from "@/components/project/OwnersEditor";
 import { MortgagesEditor } from "@/components/project/MortgagesEditor";
 import { ParcelPickerDialog } from "@/components/project/ParcelPickerDialog";
-import { useProjectMutations } from "@/hooks/use-projects";
-import { STATUS_DEFS, STATUS_KEYS, fmtDateTime, fmtDateOnly, fmtTsubo } from "@/lib/format";
-import { m2ToTsubo } from "@/lib/geo";
-import type { Project, Land } from "@/lib/types";
+import { useProjectMutations } from "@chiban/shared/hooks/use-projects";
+import { STATUS_DEFS, STATUS_KEYS, fmtDateTime, fmtDateOnly, fmtTsubo } from "@chiban/shared/lib/format";
+import { m2ToTsubo } from "@chiban/shared/lib/geo";
+import type { Project, Land } from "@chiban/shared/lib/types";
 
 const dash = (s: string) => s || "—";
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";

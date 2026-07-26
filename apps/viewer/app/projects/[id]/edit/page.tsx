@@ -1,6 +1,6 @@
-import { Topbar } from "@/components/Topbar";
+import { Topbar } from "@chiban/shared/components/Topbar";
 import { ProjectEditClient } from "@/components/project/ProjectEditClient";
-import { getProjectsTree } from "@/lib/queries/projects";
+import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
 
 export const dynamic = "force-dynamic";
 

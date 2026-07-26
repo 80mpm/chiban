@@ -5,7 +5,7 @@
 // ============================================================
 
 import type L from "leaflet";
-import type { FrontRoad, LatLng } from "@/lib/types";
+import type { FrontRoad, LatLng } from "@chiban/shared/lib/types";
 
 const ARROW_COLOR = "#b91c1c";
 const METER_PER_LAT = 111000;

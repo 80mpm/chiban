@@ -2,8 +2,8 @@
 // GET /api/parcels?town=X       — 指定町名の筆一覧（属性のみ）
 // GET /api/parcels?town=X&geometry=1 — 領域 [[lat,lng]] 付き
 
-import { withApi, jsonOk } from "@/lib/api-error";
-import { getParcels, getParcelsByTown } from "@/lib/queries/parcels";
+import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
+import { getParcels, getParcelsByTown } from "@chiban/shared/lib/queries/parcels";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

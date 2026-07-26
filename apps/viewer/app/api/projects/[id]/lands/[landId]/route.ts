@@ -1,9 +1,9 @@
 // PATCH  /api/projects/:id/lands/:landId — 土地の部分更新
 // DELETE /api/projects/:id/lands/:landId — 土地削除
 
-import { withApi, jsonOk } from "@/lib/api-error";
-import { readJsonBody } from "@/lib/request";
-import { updateLand, deleteLand } from "@/lib/queries/lands";
+import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
+import { readJsonBody } from "@chiban/shared/lib/request";
+import { updateLand, deleteLand } from "@chiban/shared/lib/queries/lands";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

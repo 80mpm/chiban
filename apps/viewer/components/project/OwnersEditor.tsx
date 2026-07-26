@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { InlineTextField } from "@/components/InlineTextField";
-import { emptyOwner, fmtDateOnly } from "@/lib/format";
-import type { Owner } from "@/lib/types";
+import { emptyOwner, fmtDateOnly } from "@chiban/shared/lib/format";
+import type { Owner } from "@chiban/shared/lib/types";
 
 /**
  * 地権者の行編集（氏名・持分・住所・登記日・登記原因）。

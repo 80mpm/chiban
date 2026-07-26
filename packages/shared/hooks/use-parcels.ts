@@ -1,9 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import * as api from "@/lib/data-client";
-import { chibanSortKey } from "@/lib/format";
-import type { ParcelSummary, ParcelWithPolygon } from "@/lib/types";
+import * as api from "@chiban/shared/lib/data-client";
+import { chibanSortKey } from "@chiban/shared/lib/format";
+import type { ParcelSummary, ParcelWithPolygon } from "@chiban/shared/lib/types";
 
 // 筆マスタは静的なのでセッション中ずっとキャッシュを使い回す。
 const STATIC = { staleTime: Infinity, gcTime: Infinity } as const;

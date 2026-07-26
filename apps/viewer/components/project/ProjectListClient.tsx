@@ -4,11 +4,11 @@ import { useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useProjects } from "@/hooks/use-projects";
-import { StatusBar } from "@/components/project/StatusBar";
+import { useProjects } from "@chiban/shared/hooks/use-projects";
+import { StatusBar } from "@chiban/shared/components/project/StatusBar";
 import { ProjectCreateDialog } from "@/components/project/ProjectCreateDialog";
-import { fmtDateOnly, fmtTsubo } from "@/lib/format";
-import type { Project, LatLng } from "@/lib/types";
+import { fmtDateOnly, fmtTsubo } from "@chiban/shared/lib/format";
+import type { Project, LatLng } from "@chiban/shared/lib/types";
 
 // Leaflet は window 前提なので SSR 無効で読み込む
 const ProjectListMap = dynamic(() => import("@/components/project/ProjectListMap"), {

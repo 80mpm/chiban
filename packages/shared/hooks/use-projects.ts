@@ -6,8 +6,8 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
-import * as api from "@/lib/data-client";
-import type { Project, Land, Visit } from "@/lib/types";
+import * as api from "@chiban/shared/lib/data-client";
+import type { Project, Land, Visit } from "@chiban/shared/lib/types";
 
 export const PROJECTS_KEY = ["projects"] as const;
 

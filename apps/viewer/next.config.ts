@@ -4,6 +4,8 @@ import type { NextConfig } from "next";
 // タイル中継は app/tile/[z]/[x]/[y]/route.ts が旧来の URL をそのまま
 // 動的ルートで受けるため、rewrites は不要。
 const nextConfig: NextConfig = {
+  // 共有パッケージは TS ソースのまま配布するため、アプリ側でトランスパイルする
+  transpilePackages: ["@chiban/shared"],
   // モノレポのファイルトレース基点をリポジトリルートに固定する
   // （lockfile の自動検出に頼らず、packages/shared を確実にトレース対象へ入れる）。
   outputFileTracingRoot: path.join(__dirname, "../.."),

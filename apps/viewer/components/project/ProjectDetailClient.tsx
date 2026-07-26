@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { KouzuView } from "@/components/kouzu/KouzuView";
+import { KouzuView } from "@chiban/shared/components/kouzu/KouzuView";
 import { VisitAddForm } from "@/components/project/VisitAddForm";
-import { useProjects } from "@/hooks/use-projects";
+import { useProjects } from "@chiban/shared/hooks/use-projects";
 import {
   STATUS_DEFS,
   formatBuilding,
@@ -13,10 +13,10 @@ import {
   fmtDateTime,
   fmtDateOnly,
   fmtTsubo,
-} from "@/lib/format";
-import type { Project, Visit, Owner, Mortgage } from "@/lib/types";
+} from "@chiban/shared/lib/format";
+import type { Project, Visit, Owner, Mortgage } from "@chiban/shared/lib/types";
 
-const ProjectAreaMap = dynamic(() => import("@/components/map/ProjectAreaMap"), {
+const ProjectAreaMap = dynamic(() => import("@chiban/shared/components/map/ProjectAreaMap"), {
   ssr: false,
   loading: () => <div className="absolute inset-0 bg-[#eef2f7]" />,
 });

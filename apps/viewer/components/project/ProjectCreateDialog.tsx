@@ -9,12 +9,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { useProjectMutations } from "@/hooks/use-projects";
+} from "@chiban/shared/components/ui/dialog";
+import { Button } from "@chiban/shared/components/ui/button";
+import { Input } from "@chiban/shared/components/ui/input";
+import { Textarea } from "@chiban/shared/components/ui/textarea";
+import { Label } from "@chiban/shared/components/ui/label";
+import { useProjectMutations } from "@chiban/shared/hooks/use-projects";
 
 /**
  * 新規案件モーダル（旧 list.js openProjectCreateForm）。

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Topbar } from "@/components/Topbar";
+import { Topbar } from "@chiban/shared/components/Topbar";
 
 // Leaflet は window 前提なので SSR 無効で読み込む（client component 内なので ssr:false 可）。
 const KouzuMapViewer = dynamic(() => import("@/components/kouzu/KouzuMapViewer"), {

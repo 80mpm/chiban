@@ -2,7 +2,7 @@
 
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Pencil, Check, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@chiban/shared/lib/utils";
 
 export interface InlineSelectOption {
   value: string;

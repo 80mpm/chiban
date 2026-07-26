@@ -1,8 +1,8 @@
 // POST /api/projects/:id/lands — 土地追加（parcelId 必須）
 
-import { withApi, jsonOk } from "@/lib/api-error";
-import { readJsonBody } from "@/lib/request";
-import { createLand } from "@/lib/queries/lands";
+import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
+import { readJsonBody } from "@chiban/shared/lib/request";
+import { createLand } from "@chiban/shared/lib/queries/lands";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

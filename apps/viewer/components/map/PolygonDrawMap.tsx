@@ -5,8 +5,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
-import { drawRoadWidthArrows, polygonWindingCCW, outwardPerp } from "./road-width-arrows";
-import type { FrontRoad, LatLng } from "@/lib/types";
+import { drawRoadWidthArrows, polygonWindingCCW, outwardPerp } from "@chiban/shared/components/map/road-width-arrows";
+import type { FrontRoad, LatLng } from "@chiban/shared/lib/types";
 
 const POLY_STYLE: L.PolylineOptions = {
   color: "#065a82",

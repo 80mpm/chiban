@@ -2,7 +2,7 @@
 
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Pencil, Check, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@chiban/shared/lib/utils";
 
 type FieldType = "input" | "textarea" | "number" | "date";
 

@@ -1,7 +1,7 @@
 // GET /api/parcel-towns — 町名（地番区域）一覧と筆数
 
-import { withApi, jsonOk } from "@/lib/api-error";
-import { getParcelTowns } from "@/lib/queries/parcels";
+import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
+import { getParcelTowns } from "@chiban/shared/lib/queries/parcels";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

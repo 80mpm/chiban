@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { fmtTsubo } from "@/lib/format";
-import type { Project } from "@/lib/types";
+import { fmtTsubo } from "@chiban/shared/lib/format";
+import type { Project } from "@chiban/shared/lib/types";
 
 function SumItem({
   label,

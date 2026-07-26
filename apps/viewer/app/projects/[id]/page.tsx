@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Topbar } from "@/components/Topbar";
+import { Topbar } from "@chiban/shared/components/Topbar";
 import { SummaryBar } from "@/components/project/SummaryBar";
 import { ProjectDetailClient } from "@/components/project/ProjectDetailClient";
-import { getProjectsTree } from "@/lib/queries/projects";
+import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
 
 export const dynamic = "force-dynamic";
 
