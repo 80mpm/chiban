@@ -134,13 +134,12 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
             >
               {def.label}
             </span>
-            <EditLink href={`${base}/edit`} label="編集" />
             <EditLink href={`${base}/parcel`} label="筆を変更" />
           </>
         }
       />
 
-      <Card title="基本情報">
+      <Card title="基本情報" action={<EditLink href={`${base}/edit`} label="編集" />}>
         <dl className="grid grid-cols-[96px_1fr] items-baseline gap-x-3 gap-y-2">
           <dt className="text-[11px] text-muted-foreground">面積</dt>
           <dd className="text-sm">
