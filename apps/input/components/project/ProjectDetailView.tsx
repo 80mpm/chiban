@@ -105,8 +105,8 @@ export function ProjectDetailView({ proj }: { proj: Project }) {
 
       {/* 領域マップ（読み取り専用プレビュー） */}
       <Card
-        title="領域マップ"
-        action={<EditLink href={`/projects/${proj.id}/map`} label="領域マップを編集" />}
+        title="領域マップ・前面道路"
+        action={<EditLink href={`/projects/${proj.id}/map`} label="領域・前面道路を編集" />}
       >
         {Array.isArray(proj.polygon) && proj.polygon.length >= 3 ? (
           <>
@@ -124,7 +124,7 @@ export function ProjectDetailView({ proj }: { proj: Project }) {
           </>
         ) : (
           <div className="py-6 text-center text-sm text-muted-foreground">
-            領域が未設定です。「領域マップを編集」から描画してください。
+            領域が未設定です。「領域・前面道路を編集」から描画してください。
           </div>
         )}
       </Card>

@@ -71,9 +71,9 @@ export function AreaMapEditClient({ proj }: { proj: Project }) {
         crumbs={[
           { label: "案件一覧", href: "/" },
           { label: proj.name, href: `/projects/${proj.id}` },
-          { label: "領域マップの編集" },
+          { label: "領域・前面道路の編集" },
         ]}
-        title="領域マップの編集"
+        title="領域・前面道路の編集"
       />
 
       <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
