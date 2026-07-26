@@ -49,8 +49,17 @@ function EditLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-/** 地権者の読み取り専用リスト（土地・建物共通）。 */
-function OwnersList({ owners }: { owners: Owner[] | undefined }) {
+/**
+ * 地権者の一覧（土地・建物共通）。editHrefFor を渡すと行ごとに
+ * 「編集」リンク（行単位の編集ページ）を出す。
+ */
+export function OwnersList({
+  owners,
+  editHrefFor,
+}: {
+  owners: Owner[] | undefined;
+  editHrefFor?: (index: number) => string;
+}) {
   if (!owners || owners.length === 0) {
     return <div className="text-xs text-muted-foreground">地権者が未設定です</div>;
   }
@@ -58,8 +67,13 @@ function OwnersList({ owners }: { owners: Owner[] | undefined }) {
     <div className="space-y-1.5">
       {owners.map((o, i) => (
         <div key={i} className="rounded-md border border-border bg-[#f8fafc] px-2.5 py-1.5 text-xs">
-          <span className="font-medium text-[color:var(--app-text-dark)]">{o.name}</span>
-          {o.share && <span className="ml-1 text-muted-foreground">（持分{o.share}）</span>}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <span className="font-medium text-[color:var(--app-text-dark)]">{o.name}</span>
+              {o.share && <span className="ml-1 text-muted-foreground">（持分{o.share}）</span>}
+            </div>
+            {editHrefFor && <EditLink href={editHrefFor(i + 1)} label="編集" />}
+          </div>
           {o.address && <div className="mt-0.5 text-muted-foreground">{o.address}</div>}
           {formatRegistration(o) && (
             <div className="mt-0.5 text-muted-foreground">{formatRegistration(o)}</div>
@@ -71,16 +85,26 @@ function OwnersList({ owners }: { owners: Owner[] | undefined }) {
   );
 }
 
-/** 抵当権の読み取り専用リスト。 */
-function MortgagesList({ mortgages }: { mortgages: Mortgage[] | undefined }) {
+/** 抵当権の一覧。editHrefFor を渡すと行ごとに「編集」リンクを出す。 */
+export function MortgagesList({
+  mortgages,
+  editHrefFor,
+}: {
+  mortgages: Mortgage[] | undefined;
+  editHrefFor?: (index: number) => string;
+}) {
   if (!mortgages || mortgages.length === 0) {
     return <div className="text-xs text-muted-foreground">抵当権なし</div>;
   }
   return (
     <ul className="space-y-1 text-xs">
       {mortgages.map((m, i) => (
-        <li key={i} className="rounded-md border border-border bg-[#f8fafc] px-2.5 py-1.5">
-          {formatMortgage(m) || "—"}
+        <li
+          key={i}
+          className="flex items-center justify-between gap-2 rounded-md border border-border bg-[#f8fafc] px-2.5 py-1.5"
+        >
+          <span className="min-w-0">{formatMortgage(m) || "—"}</span>
+          {editHrefFor && <EditLink href={editHrefFor(i + 1)} label="編集" />}
         </li>
       ))}
     </ul>
@@ -133,12 +157,18 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
         </dl>
       </Card>
 
-      <Card title={`土地の地権者（${(land.owners ?? []).length}）`} action={<EditLink href={`${base}/edit`} label="編集" />}>
-        <OwnersList owners={land.owners} />
+      <Card
+        title={`土地の地権者（${(land.owners ?? []).length}）`}
+        action={<EditLink href={`${base}/owners/new`} label="＋ 地権者を追加" />}
+      >
+        <OwnersList owners={land.owners} editHrefFor={(n) => `${base}/owners/${n}/edit`} />
       </Card>
 
-      <Card title={`抵当権（土地）（${(land.mortgages ?? []).length}）`} action={<EditLink href={`${base}/edit`} label="編集" />}>
-        <MortgagesList mortgages={land.mortgages} />
+      <Card
+        title={`抵当権（土地）（${(land.mortgages ?? []).length}）`}
+        action={<EditLink href={`${base}/mortgages/new`} label="＋ 抵当権を追加" />}
+      >
+        <MortgagesList mortgages={land.mortgages} editHrefFor={(n) => `${base}/mortgages/${n}/edit`} />
       </Card>
 
       <Card
@@ -155,7 +185,7 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
                   <strong className="text-[12px] text-[color:var(--app-text-dark)]">
                     {b.kaokuNumber ? `家屋番号 ${b.kaokuNumber}` : `建物 ${i + 1}`}
                   </strong>
-                  <EditLink href={`${base}/buildings/${encodeURIComponent(b.id)}/edit`} label="編集" />
+                  <EditLink href={`${base}/buildings/${encodeURIComponent(b.id)}`} label="詳細" />
                 </div>
                 {b.location && (
                   <div className="text-[11px] text-muted-foreground">所在：{b.location}</div>
@@ -163,21 +193,10 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
                 {formatBuilding(b) && (
                   <div className="mt-0.5 text-[11px] text-muted-foreground">{formatBuilding(b)}</div>
                 )}
-                {b.builtDate && (
-                  <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    {fmtDateOnly(b.builtDate)}新築
-                  </div>
-                )}
-                <div className="mt-1.5">
-                  <div className="mb-1 text-[11px] text-muted-foreground">建物の地権者：</div>
-                  <OwnersList owners={b.owners} />
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  地権者 {(b.owners ?? []).length} 名・抵当権 {(b.mortgages ?? []).length} 件
+                  （編集は「詳細」から）
                 </div>
-                {(b.mortgages ?? []).length > 0 && (
-                  <div className="mt-1.5">
-                    <div className="mb-1 text-[11px] text-muted-foreground">抵当権：</div>
-                    <MortgagesList mortgages={b.mortgages} />
-                  </div>
-                )}
               </div>
             ))}
           </div>

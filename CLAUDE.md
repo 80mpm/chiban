@@ -79,11 +79,18 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 | `/projects/[id]/edit` | 案件情報の編集フォーム（polygon/frontRoads は送らない） |
 | `/projects/[id]/map` | 領域・前面道路の編集（ポリゴン描画 + 前面道路幅員を**ローカル state に溜め「保存」で一括 PATCH**。描画中は保存不可） |
 | `/projects/[id]/lands/new` | 土地追加＝筆選択（町名プルダウン + 公図ビュー。クリック=選択 → ボタンで確定。成功後は新しい土地詳細へ） |
-| `/projects/[id]/lands/[landId]` | 土地詳細（基本情報・地権者・抵当権・建物一覧・訪問記録〔読み取り専用〕・削除） |
-| `/projects/[id]/lands/[landId]/edit` | 土地編集フォーム（ステータス/面積/概要 + 地権者・抵当権の複数行フィールドセット。**buildings キーは送らない**） |
+| `/projects/[id]/lands/[landId]` | 土地詳細（基本情報・地権者・抵当権・建物のカード + 各行の編集導線・削除） |
+| `/projects/[id]/lands/[landId]/edit` | 土地編集フォーム（**基本情報のみ**: ステータス/面積/概要。owners/mortgages/buildings キーは送らない） |
 | `/projects/[id]/lands/[landId]/parcel` | 筆の変更（筆選択ページの change モード） |
-| `/projects/[id]/lands/[landId]/buildings/new` | 建物追加フォーム |
-| `/projects/[id]/lands/[landId]/buildings/[buildingId]/edit` | 建物編集フォーム（削除もここ。土地の buildings 配列を再構築して PATCH。既存 id は再送で安定） |
+| `/projects/[id]/lands/[landId]/owners/new`・`owners/[n]/edit` | 土地の地権者を 1 人ずつ追加・編集・削除（`[n]` は並び順 1 始まり。行に ID が無いため） |
+| `/projects/[id]/lands/[landId]/mortgages/new`・`mortgages/[n]/edit` | 土地の抵当権を 1 件ずつ追加・編集・削除 |
+| `/projects/[id]/lands/[landId]/buildings/new` | 建物追加フォーム（基本情報のみ。作成後は新建物の詳細へ） |
+| `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の地権者・抵当権カード + 削除） |
+| `/projects/[id]/lands/[landId]/buildings/[buildingId]/edit` | 建物の基本情報の編集フォーム |
+| `.../buildings/[buildingId]/owners/...`・`mortgages/...` | 建物の地権者・抵当権の行単位ページ（土地側と同型） |
+
+行単位ページの保存はすべて「配列を再構築して PATCH で全置換」（追加=末尾・編集=index 差し替え・
+削除=filter。建物配下は該当建物を差し替えた buildings 配列を送る。既存建物 id は再送で安定）。
 
 フォーム共通: `use-form-submit.ts`（保存成功 → トースト → 詳細へ push + router.refresh / 失敗 →
 フォーム上部の赤バナー）。削除は `ConfirmDeleteButton`（confirm → DELETE → トースト → 遷移）。
@@ -249,10 +256,14 @@ apps/input/                   # 案件入力システム（事務用・port 3001
     projects/[id]/map/page.tsx   # 領域マップ編集（描画 + 幅員。一括保存）
     projects/[id]/lands/new/page.tsx           # 土地追加（筆選択）
     projects/[id]/lands/[landId]/page.tsx      # 土地詳細
-    projects/[id]/lands/[landId]/edit/page.tsx # 土地編集フォーム
+    projects/[id]/lands/[landId]/edit/page.tsx # 土地編集フォーム（基本情報のみ）
     projects/[id]/lands/[landId]/parcel/page.tsx  # 筆の変更
-    projects/[id]/lands/[landId]/buildings/new/page.tsx          # 建物追加
-    projects/[id]/lands/[landId]/buildings/[buildingId]/edit/page.tsx  # 建物編集・削除
+    projects/[id]/lands/[landId]/owners/{new,[ownerIndex]/edit}/page.tsx      # 土地の地権者（行単位）
+    projects/[id]/lands/[landId]/mortgages/{new,[mortgageIndex]/edit}/page.tsx # 土地の抵当権（行単位）
+    projects/[id]/lands/[landId]/buildings/new/page.tsx          # 建物追加（基本情報のみ）
+    projects/[id]/lands/[landId]/buildings/[buildingId]/page.tsx # 建物詳細ハブ（削除もここ）
+    projects/[id]/lands/[landId]/buildings/[buildingId]/edit/page.tsx  # 建物の基本情報編集
+    projects/[id]/lands/[landId]/buildings/[buildingId]/{owners,mortgages}/...  # 建物の地権者・抵当権（行単位）
     api/                      # projects(GET+POST) / projects/[id](PATCH/DELETE) / lands CRUD /
                               # parcel-towns / parcels / reset / youto-wms
     tile/[z]/[x]/[y]/route.ts # ZENRIN タイル中継
@@ -262,9 +273,11 @@ apps/input/                   # 案件入力システム（事務用・port 3001
     project/{ProjectListTable,ProjectForm,ProjectDetailView}.tsx
     map/{PolygonDrawMap,AreaMapEditClient}.tsx   # Leaflet.draw 描画 / 領域マップ編集ページ本体
     parcel/ParcelPickerClient.tsx                # 筆選択ページ本体（追加/変更共用）
-    land/{LandDetailView,LandForm,OwnersFieldset,MortgagesFieldset}.tsx
+    land/{LandDetailView,LandForm}.tsx           # LandDetailView は OwnersList/MortgagesList も export
+    owner/OwnerForm.tsx                          # 地権者 1 人のフォーム（土地/建物共用・削除もここ）
+    mortgage/MortgageForm.tsx                    # 抵当権 1 件のフォーム（土地/建物共用・削除もここ）
     project/FrontRoadEditor.tsx                  # 前面道路幅員の一覧編集（ローカル onChange）
-    building/BuildingForm.tsx
+    building/{BuildingForm,BuildingDetailView}.tsx
 ```
 
 ## デプロイ（Vercel）
@@ -339,8 +352,8 @@ input=「案件入力システム」）。
   frontRoads をローカルでクリアする（辺インデックスが無効になるため。従来仕様の維持）
 - 筆選択（土地追加・筆変更）は候補筆クリック=選択（青ハイライト）→ ボタンで確定の 2 段階。
   追加済みの筆は候補から除外され、重複時はサーバの 409 がフォーム上部バナーに出る
-- 地権者・抵当権は独立ページを持たず、土地/建物フォーム内の複数行フィールドセットで編集する
-  （行 ID を持たない配列全置換 API と整合させるため）
+- 地権者・抵当権は 1 行 = 1 ページで追加・編集・削除する（`owners/new`・`owners/[n]/edit` 等）。
+  行に ID が無いため URL は並び順（1 始まり）。範囲外は 404。保存は配列再構築の全置換 PATCH
 
 **案件詳細（viewer）** / **登記所備付地図ビューア** は「案件概要」記載のとおり。
 

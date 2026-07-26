@@ -4,13 +4,6 @@ import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { FormActions } from "@/components/form/FormActions";
 import { useFormSubmit } from "@/components/form/use-form-submit";
-import { OwnersFieldset, isEmptyOwner, validateOwners } from "@/components/land/OwnersFieldset";
-import {
-  MortgagesFieldset,
-  buildMortgages,
-  toMortgageDraft,
-  type MortgageDraft,
-} from "@/components/land/MortgagesFieldset";
 import { Input } from "@chiban/shared/components/ui/input";
 import { Textarea } from "@chiban/shared/components/ui/textarea";
 import { Label } from "@chiban/shared/components/ui/label";
@@ -22,27 +15,22 @@ import {
   SelectValue,
 } from "@chiban/shared/components/ui/select";
 import { updateLand } from "@chiban/shared/lib/data-client";
-import { STATUS_DEFS, STATUS_KEYS } from "@chiban/shared/lib/format";
+import { STATUS_DEFS, STATUS_KEYS, fmtTsubo } from "@chiban/shared/lib/format";
 import { m2ToTsubo } from "@chiban/shared/lib/geo";
-import { fmtTsubo } from "@chiban/shared/lib/format";
-import type { Project, Land, LandStatus, Owner } from "@chiban/shared/lib/types";
+import type { Project, Land, LandStatus } from "@chiban/shared/lib/types";
 
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
 
 /**
- * 土地の編集フォーム（ステータス・面積・概要 + 地権者/抵当権の複数行）。
- * 保存で {status, areaM2, description, owners, mortgages} を一括 PATCH する
- * （buildings キーは送らないため建物には影響しない）。
+ * 土地の基本情報の編集フォーム（ステータス・面積・概要のみ）。
+ * 地権者・抵当権・建物はそれぞれの行単位ページで編集する
+ * （このフォームは owners / mortgages / buildings キーを送らない）。
  */
 export function LandForm({ proj, land }: { proj: Project; land: Land }) {
   const { saving, error, setError, submit } = useFormSubmit();
   const [status, setStatus] = useState<LandStatus>(land.status);
   const [areaM2, setAreaM2] = useState(land.areaM2 != null ? String(land.areaM2) : "");
   const [description, setDescription] = useState(land.description ?? "");
-  const [owners, setOwners] = useState<Owner[]>(land.owners ?? []);
-  const [mortgages, setMortgages] = useState<MortgageDraft[]>(
-    (land.mortgages ?? []).map(toMortgageDraft),
-  );
 
   const backHref = `/projects/${proj.id}/lands/${land.id}`;
   const areaNum = Number(areaM2);
@@ -53,35 +41,18 @@ export function LandForm({ proj, land }: { proj: Project; land: Land }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
     const t = areaM2.trim();
     const area = t === "" ? 0 : Number(t);
     if (!Number.isFinite(area) || area < 0) {
       setError("面積は 0 以上の数値（㎡）で入力してください");
       return;
     }
-    const ownersError = validateOwners(owners, "土地の地権者");
-    if (ownersError) {
-      setError(ownersError);
-      return;
-    }
-    const built = buildMortgages(mortgages, "抵当権");
-    if ("error" in built) {
-      setError(built.error);
-      return;
-    }
-    const cleanOwners = owners
-      .filter((o) => !isEmptyOwner(o))
-      .map((o) => ({ ...o, name: o.name.trim(), share: o.share.trim().replace(/\s+/g, "") }));
-
     await submit(
       () =>
         updateLand(proj.id, land.id, {
           status,
           areaM2: area,
           description: description.trim(),
-          owners: cleanOwners,
-          mortgages: built.mortgages,
         }),
       { successMessage: "土地を保存しました", redirectTo: backHref },
     );
@@ -145,9 +116,6 @@ export function LandForm({ proj, land }: { proj: Project; land: Land }) {
             />
           </div>
         </div>
-
-        <OwnersFieldset title="土地の地権者" owners={owners} onChange={setOwners} />
-        <MortgagesFieldset title="抵当権（土地）" mortgages={mortgages} onChange={setMortgages} />
 
         <FormActions saving={saving} error={error} cancelHref={backHref} />
       </form>

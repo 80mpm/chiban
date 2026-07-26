@@ -4,27 +4,21 @@ import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { FormActions } from "@/components/form/FormActions";
 import { useFormSubmit } from "@/components/form/use-form-submit";
-import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
-import { OwnersFieldset, isEmptyOwner, validateOwners } from "@/components/land/OwnersFieldset";
-import {
-  MortgagesFieldset,
-  buildMortgages,
-  toMortgageDraft,
-  type MortgageDraft,
-} from "@/components/land/MortgagesFieldset";
 import { Input } from "@chiban/shared/components/ui/input";
 import { Textarea } from "@chiban/shared/components/ui/textarea";
 import { Label } from "@chiban/shared/components/ui/label";
 import { updateLand } from "@chiban/shared/lib/data-client";
-import type { Project, Land, Building, Owner } from "@chiban/shared/lib/types";
+import type { Project, Land, Building } from "@chiban/shared/lib/types";
 
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
 
 /**
- * 建物の作成/編集共用フォーム（所在・家屋番号・構造・種類・延床面積・新築年月日・
- * 備考 + 建物の地権者・抵当権）。
+ * 建物の基本情報の作成/編集フォーム（所在・家屋番号・構造・種類・延床面積・
+ * 新築年月日・備考のみ）。地権者・抵当権は建物詳細ページの行単位ページで編集する。
+ *
  * API は建物単体のエンドポイントを持たないため、土地の buildings 配列を再構築して
  * PATCH {buildings} で全置換する（既存建物は id ごと再送されるため id は安定）。
+ * 追加時は PATCH 応答から新しい建物の id を特定して建物詳細へ遷移する。
  */
 export function BuildingForm({
   proj,
@@ -47,37 +41,26 @@ export function BuildingForm({
   );
   const [builtDate, setBuiltDate] = useState(building?.builtDate ?? "");
   const [description, setDescription] = useState(building?.description ?? "");
-  const [owners, setOwners] = useState<Owner[]>(building?.owners ?? []);
-  const [mortgages, setMortgages] = useState<MortgageDraft[]>(
-    (building?.mortgages ?? []).map(toMortgageDraft),
-  );
 
-  const backHref = `/projects/${proj.id}/lands/${land.id}`;
-  const title = isCreate ? "建物を追加" : `建物の編集（${building.kaokuNumber || "家屋番号未設定"}）`;
+  const landBase = `/projects/${proj.id}/lands/${land.id}`;
+  const backHref = isCreate
+    ? landBase
+    : `${landBase}/buildings/${encodeURIComponent(building.id)}`;
+  const title = isCreate ? "建物を追加" : "建物の基本情報の編集";
 
-  /** 現在の入力値から Building を組み立てる。エラー時は null（setError 済み）。 */
-  function buildValues(): Building | null {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     const t = floorArea.trim();
     let area: number | null = null;
     if (t !== "") {
       const n = Number(t);
       if (!Number.isFinite(n) || n < 0) {
         setError("延床面積は 0 以上の数値（㎡）で入力してください");
-        return null;
+        return;
       }
       area = n;
     }
-    const ownersError = validateOwners(owners, "建物の地権者");
-    if (ownersError) {
-      setError(ownersError);
-      return null;
-    }
-    const built = buildMortgages(mortgages, "抵当権");
-    if ("error" in built) {
-      setError(built.error);
-      return null;
-    }
-    return {
+    const values: Building = {
       id: building?.id ?? "",
       location: location.trim(),
       kaokuNumber: kaokuNumber.trim(),
@@ -86,27 +69,27 @@ export function BuildingForm({
       floorArea: area,
       builtDate,
       description: description.trim(),
-      owners: owners
-        .filter((o) => !isEmptyOwner(o))
-        .map((o) => ({ ...o, name: o.name.trim(), share: o.share.trim().replace(/\s+/g, "") })),
-      mortgages: built.mortgages,
+      // 追加時は空、編集時は既存の地権者・抵当権を維持して再送する
+      owners: building?.owners ?? [],
+      mortgages: building?.mortgages ?? [],
       createdAt: building?.createdAt ?? null,
       updatedAt: building?.updatedAt ?? null,
     };
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const values = buildValues();
-    if (!values) return;
-    // 土地の buildings 配列を再構築（他の建物は既存 id ごと再送して id を安定させる）
     const current = land.buildings ?? [];
     const next = isCreate
       ? [...current, values]
       : current.map((b) => (b.id === building.id ? values : b));
+    const knownIds = new Set(current.map((b) => b.id));
     await submit(() => updateLand(proj.id, land.id, { buildings: next }), {
       successMessage: isCreate ? "建物を追加しました" : "建物を保存しました",
-      redirectTo: backHref,
+      redirectTo: (saved) => {
+        if (!isCreate) return backHref;
+        // 追加時は応答から新規 id（送信前に存在しなかった id）を特定して詳細へ
+        const created = (saved.buildings ?? []).find((b) => !knownIds.has(b.id));
+        return created
+          ? `${landBase}/buildings/${encodeURIComponent(created.id)}`
+          : landBase;
+      },
     });
   }
 
@@ -118,7 +101,10 @@ export function BuildingForm({
         crumbs={[
           { label: "案件一覧", href: "/" },
           { label: proj.name, href: `/projects/${proj.id}` },
-          { label: landTitle(land), href: backHref },
+          { label: landTitle(land), href: landBase },
+          ...(isCreate
+            ? []
+            : [{ label: `建物 ${building.kaokuNumber || ""}`.trim(), href: backHref }]),
           { label: title },
         ]}
         title={title}
@@ -133,6 +119,7 @@ export function BuildingForm({
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="例：西浅草二丁目24番地3"
+              autoFocus={isCreate}
             />
           </div>
           <div className={fieldCls}>
@@ -197,9 +184,6 @@ export function BuildingForm({
           </div>
         </div>
 
-        <OwnersFieldset title="建物の地権者" owners={owners} onChange={setOwners} />
-        <MortgagesFieldset title="抵当権（建物）" mortgages={mortgages} onChange={setMortgages} />
-
         <FormActions
           saving={saving}
           error={error}
@@ -208,20 +192,10 @@ export function BuildingForm({
         />
       </form>
 
-      {!isCreate && (
-        <div className="mt-4 flex justify-end">
-          <ConfirmDeleteButton
-            label="この建物を削除"
-            confirmMessage={`建物「${building.kaokuNumber || "家屋番号未設定"}」を削除します。よろしいですか？`}
-            successMessage="建物を削除しました"
-            redirectTo={backHref}
-            onDelete={() =>
-              updateLand(proj.id, land.id, {
-                buildings: (land.buildings ?? []).filter((b) => b.id !== building.id),
-              })
-            }
-          />
-        </div>
+      {isCreate && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          建物の地権者・抵当権は、追加後の建物詳細ページから入力できます。
+        </p>
       )}
     </main>
   );
