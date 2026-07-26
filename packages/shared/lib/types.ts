@@ -36,13 +36,15 @@ export interface Mortgage {
 /** 建物。土地とは別に登記され、地権者も土地と異なりうる（借地上建物など）。 */
 export interface Building {
   id: string;
+  /** 所在（登記上の所在。例「西浅草二丁目24番地3」）。 */
+  location: string;
   /** 家屋番号。 */
   kaokuNumber: string;
   /** 構造（例「木造2階建」）。 */
   structure: string;
   /** 種類・用途（例「居宅」「共同住宅」）。 */
   usage: string;
-  /** 床面積（㎡）。未設定は null。 */
+  /** 延床面積（㎡）。未設定は null。 */
   floorArea: number | null;
   /** 新築年月日（'YYYY-MM-DD'。未設定は空文字）。 */
   builtDate: string;

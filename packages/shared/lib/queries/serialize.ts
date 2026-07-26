@@ -58,6 +58,7 @@ export function visitJson(row: VisitRow): Visit {
 export interface BuildingRow {
   id: string;
   land_id: string;
+  location: string;
   kaoku_number: string;
   structure: string;
   usage: string;
@@ -85,6 +86,7 @@ export function mortgagesJson(rows: MortgageRow[]): Mortgage[] {
 export function buildingJson(row: BuildingRow): Building {
   return {
     id: row.id,
+    location: row.location,
     kaokuNumber: row.kaoku_number,
     structure: row.structure,
     usage: row.usage,

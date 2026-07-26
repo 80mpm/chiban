@@ -179,6 +179,9 @@ export function ProjectDetailClient({
                     <div className="text-[12px] font-medium text-[#1e293b]">
                       {b.kaokuNumber || "（家屋番号未設定）"}
                     </div>
+                    {b.location && (
+                      <div className="mt-0.5 text-[11px] text-[#64748b]">所在：{b.location}</div>
+                    )}
                     {formatBuilding(b) && (
                       <div className="mt-0.5 text-[11px] text-[#64748b]">{formatBuilding(b)}</div>
                     )}

@@ -11,6 +11,7 @@ import type { Building } from "@chiban/shared/lib/types";
 function emptyBuilding(): Building {
   return {
     id: "",
+    location: "",
     kaokuNumber: "",
     structure: "",
     usage: "",
@@ -25,7 +26,7 @@ function emptyBuilding(): Building {
 }
 
 /**
- * 土地の建物を編集する（家屋番号・構造・種類・床面積・建物の地権者）。
+ * 土地の建物を編集する（所在・家屋番号・構造・種類・延床面積・建物の地権者・抵当権）。
  * どの変更も建物配列全体を再構築して onChange に渡し、土地 PATCH で全置換する。
  */
 export function BuildingsEditor({
@@ -82,10 +83,18 @@ export function BuildingsEditor({
               </div>
 
               <div className="grid grid-cols-[76px_1fr] items-center gap-x-2.5 gap-y-1.5 text-sm">
+                <label className={labelCls}>所在</label>
+                <InlineTextField
+                  type="input"
+                  placeholder="例：西浅草二丁目24番地3"
+                  value={b.location}
+                  onConfirm={(next) => patchBuilding(i, { location: next.trim() })}
+                />
+
                 <label className={labelCls}>家屋番号</label>
                 <InlineTextField
                   type="input"
-                  placeholder="例：西浅草二丁目24番3"
+                  placeholder="例：24番3"
                   value={b.kaokuNumber}
                   onConfirm={(next) => patchBuilding(i, { kaokuNumber: next.trim() })}
                 />
@@ -106,7 +115,7 @@ export function BuildingsEditor({
                   onConfirm={(next) => patchBuilding(i, { usage: next.trim() })}
                 />
 
-                <label className={labelCls}>床面積</label>
+                <label className={labelCls}>延床面積</label>
                 <InlineTextField
                   type="number"
                   placeholder="例：96.52"
@@ -117,7 +126,7 @@ export function BuildingsEditor({
                     if (t === "") return patchBuilding(i, { floorArea: null });
                     const n = Number(t);
                     if (!Number.isFinite(n) || n < 0) {
-                      toast.error("床面積は 0 以上の数値で入力してください");
+                      toast.error("延床面積は 0 以上の数値で入力してください");
                       return false;
                     }
                     return patchBuilding(i, { floorArea: n });

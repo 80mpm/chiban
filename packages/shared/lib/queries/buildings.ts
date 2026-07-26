@@ -65,9 +65,9 @@ export async function replaceBuildings(
         ? null
         : Number(b.floorArea);
     await sql`
-      INSERT INTO buildings (id, land_id, kaoku_number, structure, usage, floor_area,
+      INSERT INTO buildings (id, land_id, location, kaoku_number, structure, usage, floor_area,
                              built_date, description)
-      VALUES (${bid}, ${landId}, ${(b?.kaokuNumber ?? "").trim()},
+      VALUES (${bid}, ${landId}, ${(b?.location ?? "").trim()}, ${(b?.kaokuNumber ?? "").trim()},
               ${(b?.structure ?? "").trim()}, ${(b?.usage ?? "").trim()}, ${floorArea},
               ${dateOrNull(b?.builtDate)}, ${(b?.description ?? "").trim()})
     `;

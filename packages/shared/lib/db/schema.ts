@@ -100,16 +100,20 @@ CREATE INDEX IF NOT EXISTS idx_land_mortgages_land ON land_mortgages (land_id, i
 CREATE TABLE IF NOT EXISTS buildings (
     id           text PRIMARY KEY,
     land_id      text NOT NULL REFERENCES lands(id) ON DELETE CASCADE,
+    location     text NOT NULL DEFAULT '',   -- 所在（登記上の所在。例「西浅草二丁目24番地3」）
     kaoku_number text NOT NULL DEFAULT '',   -- 家屋番号
     structure    text NOT NULL DEFAULT '',   -- 構造（例「木造2階建」）
     usage        text NOT NULL DEFAULT '',   -- 種類・用途（非予約語。静的 INSERT で使うため引用符不要）
-    floor_area   numeric,                    -- 床面積（㎡）。未設定は NULL
+    floor_area   numeric,                    -- 延床面積（㎡）。未設定は NULL
     built_date   date,                       -- 新築年月日（未設定は NULL ↔ API では ''）
     description  text NOT NULL DEFAULT '',   -- 備考
     created_at   timestamptz NOT NULL DEFAULT now(),
     updated_at   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_buildings_land ON buildings (land_id, created_at, id);
+-- 2026-07 追加列（既存 DB をデータを保持したまま追随させる。CREATE TABLE IF NOT EXISTS は
+-- 既存テーブルに列を足さないため、後から増えた列はここで冪等に ALTER する）
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS location text NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS building_owners (
     id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- 追加順（= owners 配列の並び）

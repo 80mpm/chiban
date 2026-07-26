@@ -102,6 +102,7 @@ function mortgage(date: string, amount: number | null, holder: string): Mortgage
 }
 
 function building(
+  location: string,
   kaokuNumber: string,
   structure: string,
   usage: string,
@@ -110,6 +111,7 @@ function building(
   extras: Partial<Pick<SampleBuilding, "builtDate" | "description" | "mortgages">> = {},
 ): SampleBuilding {
   return {
+    location,
     kaokuNumber,
     structure,
     usage,
@@ -125,7 +127,7 @@ function building(
 /** サンプル建物（id は投入時に採番するため持たない）。 */
 type SampleBuilding = Pick<
   Building,
-  "kaokuNumber" | "structure" | "usage" | "floorArea" | "builtDate" | "description" | "owners" | "mortgages"
+  "location" | "kaokuNumber" | "structure" | "usage" | "floorArea" | "builtDate" | "description" | "owners" | "mortgages"
 >;
 
 interface SampleLand {
@@ -249,7 +251,8 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
         updatedAt: t(3),
         buildings: [
           building(
-            "西浅草二丁目24番3",
+            "西浅草二丁目24番地3",
+            "24番3",
             "木造瓦葺2階建",
             "居宅",
             96.52,
@@ -274,7 +277,8 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
         updatedAt: t(6),
         buildings: [
           building(
-            "西浅草二丁目23番1",
+            "西浅草二丁目23番地1",
+            "23番1",
             "鉄骨造陸屋根3階建",
             "共同住宅",
             210.35,
@@ -314,7 +318,8 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
         mortgages: [mortgage("2018-03-19", 3906, "ABC銀行")],
         buildings: [
           building(
-            "西浅草二丁目24番5",
+            "西浅草二丁目24番地5",
+            "24番5",
             "木造亜鉛メッキ鋼板葺2階建",
             "居宅兼店舗",
             74.18,
