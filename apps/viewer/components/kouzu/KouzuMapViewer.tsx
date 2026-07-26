@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
+import { addBaseTileLayer } from "@chiban/shared/components/map/base-tile-layer";
 import "leaflet/dist/leaflet.css";
 
 const SHEET_COLORS = ["#2563eb", "#d97706", "#059669", "#db2777"];
@@ -73,7 +74,7 @@ export default function KouzuMapViewer() {
     if (!el || !data) return;
 
     const map = L.map(el, { zoomControl: true, maxZoom: 22, attributionControl: false });
-    L.tileLayer("/tile/{z}/{x}/{y}.png", { maxZoom: 22 }).addTo(map);
+    addBaseTileLayer(map);
     mapRef.current = map;
 
     const features = data.geojson.features;

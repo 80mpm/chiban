@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { drawRoadWidthArrows } from "./road-width-arrows";
+import { addBaseTileLayer } from "./base-tile-layer";
+import { MAP_TILES_DISABLED } from "@chiban/shared/lib/map-flags";
 import type { Project } from "@chiban/shared/lib/types";
 
 /**
@@ -49,16 +51,19 @@ export default function ProjectAreaMap({ project }: { project: Project }) {
       attributionControl: false,
     });
     mapRef.current = map;
-    L.tileLayer("/tile/{z}/{x}/{y}.png", { maxZoom: 22 }).addTo(map);
+    addBaseTileLayer(map);
     // 用途地域オーバーレイ（生成のみ。トグルで addTo/removeLayer する）。
-    youtoRef.current = L.tileLayer.wms("/api/youto-wms", {
-      layers: "lp1",
-      format: "image/png",
-      transparent: true,
-      version: "1.3.0",
-      opacity: 0.55,
-      maxZoom: 22,
-    });
+    // タイル停止中は WMS も投げない（youtoRef が null のままなのでトグルは無効）。
+    if (!MAP_TILES_DISABLED) {
+      youtoRef.current = L.tileLayer.wms("/api/youto-wms", {
+        layers: "lp1",
+        format: "image/png",
+        transparent: true,
+        version: "1.3.0",
+        opacity: 0.55,
+        maxZoom: 22,
+      });
+    }
     setTimeout(() => map.invalidateSize(), 0);
 
     const pts = project.polygon;
@@ -119,15 +124,18 @@ export default function ProjectAreaMap({ project }: { project: Project }) {
   return (
     <>
       <div ref={elRef} className="absolute inset-0" />
-      <label className="absolute right-2 top-2 z-[500] flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-[color:var(--app-text-dark)] shadow-sm">
-        <input
-          type="checkbox"
-          checked={showYouto}
-          onChange={(e) => setShowYouto(e.target.checked)}
-          className="accent-brand"
-        />
-        用途地域
-      </label>
+      {/* タイル停止中は用途地域 WMS も投げないためトグルごと隠す */}
+      {!MAP_TILES_DISABLED && (
+        <label className="absolute right-2 top-2 z-[500] flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-[color:var(--app-text-dark)] shadow-sm">
+          <input
+            type="checkbox"
+            checked={showYouto}
+            onChange={(e) => setShowYouto(e.target.checked)}
+            className="accent-brand"
+          />
+          用途地域
+        </label>
+      )}
 
       {showYouto && (
         <div className="absolute right-2 top-11 z-[500] max-h-[calc(100%-3.5rem)] overflow-y-auto rounded-md border border-border bg-white/95 px-2.5 py-2 shadow-sm">

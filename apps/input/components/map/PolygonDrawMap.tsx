@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
+import { addBaseTileLayer } from "@chiban/shared/components/map/base-tile-layer";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw";
 import "leaflet-draw/dist/leaflet.draw.css";
@@ -320,7 +321,7 @@ export default function PolygonDrawMap({
       zoomControl: true,
       attributionControl: false,
     });
-    L.tileLayer("/tile/{z}/{x}/{y}.png", { maxZoom: 22 }).addTo(map);
+    addBaseTileLayer(map);
     const group = new L.FeatureGroup().addTo(map);
     const badgeGroup = new L.FeatureGroup().addTo(map);
     mapRef.current = map;

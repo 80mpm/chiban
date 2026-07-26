@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import L from "leaflet";
+import { addBaseTileLayer } from "@chiban/shared/components/map/base-tile-layer";
 import "leaflet/dist/leaflet.css";
 import type { Project, LatLng } from "@chiban/shared/lib/types";
 
@@ -45,7 +46,7 @@ export default function ProjectListMap({
       zoomControl: true,
       attributionControl: false,
     });
-    L.tileLayer("/tile/{z}/{x}/{y}.png", { maxZoom: 22 }).addTo(map);
+    addBaseTileLayer(map);
     mapRef.current = map;
     setTimeout(() => map.invalidateSize(), 0);
     return () => {
