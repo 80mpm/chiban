@@ -29,9 +29,14 @@ export function ProjectListTable({ initialProjects }: { initialProjects: Project
           <p className="text-sm text-[color:var(--app-text-light)]">
             {projects.length} 件の案件
           </p>
-          <Button size="sm" asChild>
-            <Link href="/projects/new">＋ 新規案件</Link>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Link href="/users" className="text-sm text-brand hover:underline">
+              ユーザー管理
+            </Link>
+            <Button size="sm" asChild>
+              <Link href="/projects/new">＋ 新規案件</Link>
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-[color:var(--app-border)] bg-white shadow-sm">

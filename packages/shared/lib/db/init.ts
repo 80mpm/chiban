@@ -11,6 +11,7 @@ import { sql } from "./client";
 import { SCHEMA_SQL } from "./schema";
 import { seedAddressMasterIfEmpty } from "./seed-address";
 import { seedParcelsIfEmpty } from "./seed-parcels";
+import { seedUsersIfEmpty } from "./seed-users";
 import { insertSamples } from "./sample";
 
 /** 旧スキーマの DB を検出して初期化を案内する（デモのため ALTER 移行は持たない）。 */
@@ -72,6 +73,7 @@ async function initDb(): Promise<void> {
   await sql.unsafe(SCHEMA_SQL).simple();
   await seedAddressMasterIfEmpty(sql);
   await seedParcelsIfEmpty(sql);
+  await seedUsersIfEmpty(sql);
 
   const seeded = await sql`SELECT 1 FROM app_meta WHERE key = 'seeded'`;
   if (seeded.length === 0) {

@@ -140,3 +140,20 @@ export interface ParcelSummary {
 export interface ParcelWithPolygon extends ParcelSummary {
   polygon: LatLng[];
 }
+
+/** ユーザーの種別。sales=営業（閲覧システム利用）/ office=事務（入力システム利用）。 */
+export type UserRole = "sales" | "office";
+
+/** ユーザー（両システム共用アカウント）。パスワードハッシュは API に含めない。 */
+export interface User {
+  id: string;
+  /** ログインID（半角英数と - _。UNIQUE な属性であり主キーではない）。 */
+  loginId: string;
+  /** 表示名。 */
+  name: string;
+  role: UserRole;
+  /** 停止中は false（削除機能は持たない）。 */
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}

@@ -3,7 +3,7 @@
 // クライアント・サーバ双方から使える純関数。
 // ============================================================
 
-import type { Owner, LandStatus, Building, Mortgage } from "./types";
+import type { Owner, LandStatus, Building, Mortgage, UserRole } from "./types";
 
 /** ステータス定義（label / color）。 */
 export const STATUS_DEFS: Record<LandStatus, { label: string; color: string }> = {
@@ -12,6 +12,14 @@ export const STATUS_DEFS: Record<LandStatus, { label: string; color: string }> =
 };
 
 export const STATUS_KEYS: LandStatus[] = ["target", "acquired"];
+
+/** ユーザー種別の表示定義（sales=閲覧システム利用 / office=入力システム利用）。 */
+export const USER_ROLE_DEFS: Record<UserRole, { label: string; system: string }> = {
+  sales: { label: "営業", system: "案件閲覧システム" },
+  office: { label: "事務", system: "案件入力システム" },
+};
+
+export const USER_ROLE_KEYS: UserRole[] = ["sales", "office"];
 
 /**
  * owners 配列を表示用文字列に整形する。

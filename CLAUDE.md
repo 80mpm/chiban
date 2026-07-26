@@ -88,6 +88,10 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 | `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の地権者・抵当権カード + 削除） |
 | `/projects/[id]/lands/[landId]/buildings/[buildingId]/edit` | 建物の基本情報の編集フォーム |
 | `.../buildings/[buildingId]/owners/...`・`mortgages/...` | 建物の地権者・抵当権の行単位ページ（土地側と同型） |
+| `/users` | ユーザー管理（一覧。種別フィルタタブ「すべて/営業/事務」= Issue #22/#23。案件一覧ヘッダから遷移） |
+| `/users/new` | ユーザー登録（ログインID・氏名・種別・初期パスワード） |
+| `/users/[userId]/edit` | ユーザー編集（氏名・種別。ログインIDは変更不可）+ 停止/再開ボタン |
+| `/users/[userId]/password` | パスワード再設定（管理者が直接設定するデモ方式） |
 
 行単位ページの保存はすべて「配列を再構築して PATCH で全置換」（追加=末尾・編集=index 差し替え・
 削除=filter。建物配下は該当建物を差し替えた buildings 配列を送る。既存建物 id は再送で安定）。
@@ -197,6 +201,9 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
 | `POST /api/projects/:id/lands` | 土地追加（parcelId 必須。マスタ外 400・案件内重複 409） |
 | `PATCH /api/projects/:id/lands/:landId` | 土地の部分更新（parcelId 変更で町名・地番・領域・面積㎡を再導出） |
 | `DELETE /api/projects/:id/lands/:landId` | 土地削除 |
+| `GET /api/users` | 全ユーザー（password_hash は決して返さない） |
+| `POST /api/users` | ユーザー登録 {loginId, name, role, password}（loginId 重複 409） |
+| `PATCH /api/users/:userId` | ユーザーの部分更新 {name?, role?, isActive?, password?}（password でパスワード再設定。削除 API は無し・停止 = isActive:false） |
 
 エラーは `lib/api-error.ts` の `ApiError(status, 日本語message)` を `withApi()` で
 `Response.json({error}, {status})` に変換する。DB 接続不能は 503、UNIQUE 違反は 409。
@@ -278,6 +285,7 @@ apps/input/                   # 案件入力システム（事務用・port 3001
     mortgage/MortgageForm.tsx                    # 抵当権 1 件のフォーム（土地/建物共用・削除もここ）
     project/FrontRoadEditor.tsx                  # 前面道路幅員の一覧編集（ローカル onChange）
     building/{BuildingForm,BuildingDetailView}.tsx
+    user/{UserListTable,UserForm,PasswordForm}.tsx  # ユーザー管理（一覧/登録・編集/パスワード再設定）
 ```
 
 ## デプロイ（Vercel）
@@ -448,6 +456,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_m2, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)`。地権者は `land_owners`、抵当権は `land_mortgages` に正規化 |
 | `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
+| `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。初期 3 名を冪等シード（初期パスワード `demo1234`）。**`POST /api/reset` では消えない** |
 
 - 案件・土地の削除はカスケード。numeric（容積率・面積）は postgres.js では文字列で返るため `serialize.ts` で数値化する
 - **面積は ㎡ 保存が正本**（`lands.area_m2`。登記の地積単位）。坪は表示専用の導出値で、
@@ -462,8 +471,11 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 
 ## できること / できないこと
 
-- できること: 案件・土地のCRUD、ステータス変更、土地パネルからの訪問記録追加、サンプルデータへのリセット
-- できないこと: 訪問記録の編集・削除（履歴のため不可）
+- できること: 案件・土地のCRUD、ステータス変更、訪問記録追加（閲覧システム）、サンプルデータへのリセット、
+  ユーザー管理（登録・停止/再開・パスワード再設定。入力システムの `/users`）
+- できないこと: 訪問記録の編集・削除（履歴のため不可）、ユーザーの削除（停止のみ）、
+  ログイン（認証基盤のセッション部分と合わせて後続 Issue #21/#2/#35 で実装予定。
+  現状はユーザー管理画面自体も未認証で開ける＝デモ前提）
 
 ## 技術的な注意点
 

@@ -154,6 +154,18 @@ CREATE TABLE IF NOT EXISTS visits (
 );
 CREATE INDEX IF NOT EXISTS idx_visits_land ON visits (land_id, date);
 
+-- ユーザー（両システム共用のアカウント。営業=閲覧系 / 事務=入力系）
+CREATE TABLE IF NOT EXISTS users (
+    id            text PRIMARY KEY,                -- uuid（サロゲートキー。login_id は属性）
+    login_id      text NOT NULL UNIQUE,            -- ログインID（半角英数と - _）
+    name          text NOT NULL,                   -- 表示名
+    role          text NOT NULL CHECK (role IN ('sales','office')),  -- sales=営業 / office=事務
+    password_hash text NOT NULL,                   -- scrypt 形式（lib/auth/password.ts）。API には返さない
+    is_active     boolean NOT NULL DEFAULT true,   -- 停止 = false（削除機能は持たない）
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS app_meta (
     key   text PRIMARY KEY,
     value text NOT NULL

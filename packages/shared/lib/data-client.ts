@@ -16,6 +16,8 @@ import type {
   ParcelWithPolygon,
   LatLng,
   LandStatus,
+  User,
+  UserRole,
 } from "./types";
 
 async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -102,6 +104,21 @@ export const addVisit = (
     `/api/projects/${encodeURIComponent(projectId)}/lands/${encodeURIComponent(landId)}/visits`,
     fields,
   );
+
+// ----- ユーザー管理（入力システムのみ） -----
+export const fetchUsers = () => api<User[]>("GET", "/api/users");
+
+export const createUser = (fields: {
+  loginId: string;
+  name: string;
+  role: UserRole;
+  password: string;
+}) => api<User>("POST", "/api/users", fields);
+
+export const updateUser = (
+  userId: string,
+  fields: { name?: string; role?: UserRole; isActive?: boolean; password?: string },
+) => api<User>("PATCH", `/api/users/${encodeURIComponent(userId)}`, fields);
 
 // ----- リセット -----
 export const resetSamples = () => api<{ ok: true }>("POST", "/api/reset");
