@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useProjects } from "@chiban/shared/hooks/use-projects";
 import { StatusBar } from "@chiban/shared/components/project/StatusBar";
-import { ProjectCreateDialog } from "@/components/project/ProjectCreateDialog";
 import { fmtDateOnly, fmtTsubo } from "@chiban/shared/lib/format";
 import type { Project, LatLng } from "@chiban/shared/lib/types";
 
@@ -25,7 +24,6 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
   const { data: projects = [] } = useProjects(initialProjects);
   const [searchTarget, setSearchTarget] = useState<LatLng | null>(null);
   const [searching, setSearching] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
 
   const goToDetail = (id: string) =>
     router.push(`/projects/${encodeURIComponent(id)}`);
@@ -92,12 +90,6 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
             </h2>
             <div className="text-xs text-muted-foreground">{projects.length} 件</div>
           </div>
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
-          >
-            ＋ 新規案件
-          </button>
         </div>
 
         <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3">
@@ -105,7 +97,7 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
             <div className="px-2 py-10 text-center text-sm text-muted-foreground">
               案件がありません。
               <br />
-              「＋ 新規案件」から作成してください。
+              案件入力システムから登録してください。
             </div>
           ) : (
             projects.map((p) => {
@@ -145,8 +137,6 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
           )}
         </div>
       </aside>
-
-      <ProjectCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
     </main>
   );
 }

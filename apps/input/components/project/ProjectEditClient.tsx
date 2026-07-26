@@ -155,7 +155,17 @@ export function ProjectEditClient({
         <div className="text-xs text-muted-foreground">
           <Link href="/" className="text-brand hover:underline">案件一覧</Link>
           {" › "}
-          <Link href={`/projects/${proj.id}`} className="text-brand hover:underline">案件詳細</Link>
+          {/* 案件詳細は閲覧システム側の画面（別アプリ）。オリジン未設定ならリンクなし */}
+          {process.env.NEXT_PUBLIC_VIEWER_ORIGIN ? (
+            <a
+              href={`${process.env.NEXT_PUBLIC_VIEWER_ORIGIN}/projects/${encodeURIComponent(proj.id)}`}
+              className="text-brand hover:underline"
+            >
+              案件詳細
+            </a>
+          ) : (
+            <span>案件詳細</span>
+          )}
           {" › "}
           <span>案件編集</span>
           {" › "}

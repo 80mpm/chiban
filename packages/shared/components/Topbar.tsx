@@ -10,13 +10,16 @@ import { toast } from "sonner";
  * 構造: h1（システム名リンク + 画面名 + DEMO バッジ）→ サンプルデータに戻す
  *
  * @param screen 画面名（「案件一覧」「案件編集」など）
+ * @param appName システム名（既定は「案件管理システム」。入力システムでは「案件入力システム」）
  */
 export function Topbar({
   screen,
   showReset = true,
+  appName = "案件管理システム",
 }: {
   screen: string;
   showReset?: boolean;
+  appName?: string;
 }) {
   const queryClient = useQueryClient();
   const [resetting, setResetting] = useState(false);
@@ -59,7 +62,7 @@ export function Topbar({
           href="/"
           className="-mx-1.5 -my-0.5 rounded px-1.5 py-0.5 text-inherit no-underline transition-colors hover:bg-white/10"
         >
-          案件管理システム
+          {appName}
         </Link>{" "}
         — {screen}{" "}
         <span className="ml-2 inline-block rounded-lg bg-badge px-[7px] py-0.5 align-middle text-[10px] font-medium">

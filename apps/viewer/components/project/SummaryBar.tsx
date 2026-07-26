@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { fmtTsubo } from "@chiban/shared/lib/format";
 import type { Project } from "@chiban/shared/lib/types";
 
@@ -31,7 +30,7 @@ function SumItem({
   );
 }
 
-/** 案件サマリー横帯（旧 detail.html summary-bar）。末尾に案件編集への導線。 */
+/** 案件サマリー横帯（旧 detail.html summary-bar）。 */
 export function SummaryBar({ project }: { project: Project }) {
   const totalTsubo = (project.lands ?? []).reduce(
     (s, l) => s + (Number(l.areaTsubo) || 0),
@@ -47,12 +46,6 @@ export function SummaryBar({ project }: { project: Project }) {
         <SumItem label="容積率" value={project.currentFar != null ? `${project.currentFar}%` : null} />
         <SumItem label="想定容積率" value={project.targetFar != null ? `${project.targetFar}%` : null} />
         <SumItem label="担当" value={project.staff} />
-        <Link
-          href={`/projects/${encodeURIComponent(project.id)}/edit`}
-          className="my-0 mx-4 flex-none self-center whitespace-nowrap rounded-md bg-brand px-3.5 py-1.5 text-xs font-semibold text-white no-underline hover:bg-[#0a78ad]"
-        >
-          案件編集
-        </Link>
       </div>
       <div className="flex items-stretch border-t border-[#eef2f7]">
         <SumItem label="アクセス" value={project.access} />

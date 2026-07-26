@@ -1,20 +1,12 @@
-// GET  /api/projects — 全案件を lands・visits 込みのツリーで返す
-// POST /api/projects — 案件作成
+// GET /api/projects — 全案件を lands・visits 込みのツリーで返す
+// （案件の作成・更新・削除は案件入力システム側の API が担う）
 
 import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
-import { readJsonBody } from "@chiban/shared/lib/request";
-import { getProjectsTree, createProject } from "@chiban/shared/lib/queries/projects";
+import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   return withApi(async () => jsonOk(await getProjectsTree()));
-}
-
-export async function POST(req: Request) {
-  return withApi(async () => {
-    const body = await readJsonBody(req);
-    return jsonOk(await createProject(body), 201);
-  });
 }
