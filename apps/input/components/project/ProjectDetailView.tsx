@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { KouzuView } from "@chiban/shared/components/kouzu/KouzuView";
-import { StatusBar } from "@chiban/shared/components/project/StatusBar";
 import { deleteProject } from "@chiban/shared/lib/data-client";
 import { formatOwners, fmtDateOnly, fmtDateTime, fmtTsubo, STATUS_DEFS } from "@chiban/shared/lib/format";
 import type { Project, Land } from "@chiban/shared/lib/types";
@@ -66,8 +65,6 @@ function EditLink({ href, label }: { href: string; label: string }) {
 export function ProjectDetailView({ proj }: { proj: Project }) {
   const router = useRouter();
   const lands = proj.lands ?? [];
-  const acquired = lands.filter((l) => l.status === "acquired").length;
-  const totalTsubo = lands.reduce((s, l) => s + (Number(l.areaTsubo) || 0), 0);
   const viewerOrigin = process.env.NEXT_PUBLIC_VIEWER_ORIGIN;
   const frontRoads = proj.frontRoads ?? [];
 
@@ -89,18 +86,6 @@ export function ProjectDetailView({ proj }: { proj: Project }) {
           ) : undefined
         }
       />
-
-      {/* 取得状況サマリ */}
-      <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
-        <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            取得状況：取得済 {acquired} / {lands.length} 件
-            {lands.length > 0 && `（${Math.round((acquired / lands.length) * 100)}%）`}
-          </span>
-          <span>総坪数 {totalTsubo > 0 ? `${fmtTsubo(totalTsubo)} 坪` : "—"}</span>
-        </div>
-        <StatusBar lands={lands} />
-      </section>
 
       {/* 案件情報 */}
       <Card title="案件情報" action={<EditLink href={`/projects/${proj.id}/edit`} label="編集" />}>
