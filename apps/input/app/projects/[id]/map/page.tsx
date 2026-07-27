@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Topbar } from "@chiban/shared/components/Topbar";
 import { AreaMapEditClient } from "@/components/map/AreaMapEditClient";
 import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
+import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +13,13 @@ export default async function AreaMapEditPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const user = await requireAppUser(`/projects/${id}/map`);
   const projects = await getProjectsTree();
   const proj = projects.find((p) => p.id === id);
   if (!proj) notFound();
   return (
     <div className="grid h-screen grid-rows-[56px_1fr]">
-      <Topbar appName="案件入力システム" screen="領域・前面道路の編集" />
+      <Topbar user={user} appName="案件入力システム" screen="領域・前面道路の編集" />
       <div className="min-h-0 overflow-y-auto bg-[color:var(--app-bg)]">
         <AreaMapEditClient proj={proj} />
       </div>

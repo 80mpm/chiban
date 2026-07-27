@@ -59,6 +59,23 @@ function validateRole(role: unknown): asserts role is UserRole {
   }
 }
 
+/** 認証用レコード（password_hash を含む。lib/auth/session.ts 専用で API には出さない）。 */
+export interface AuthRecord {
+  id: string;
+  password_hash: string;
+  role: UserRole;
+  is_active: boolean;
+}
+
+/** login_id で認証用レコードを引く（見つからなければ null）。 */
+export async function getAuthRecordByLoginId(loginId: string): Promise<AuthRecord | null> {
+  await ensureDbReady();
+  const rows = await sql<AuthRecord[]>`
+    SELECT id, password_hash, role, is_active FROM users WHERE login_id = ${loginId}
+  `;
+  return rows[0] ?? null;
+}
+
 /** 全ユーザー（ログインID順）。 */
 export async function listUsers(): Promise<User[]> {
   await ensureDbReady();

@@ -4,9 +4,14 @@
 import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
 import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
 
+import { requireAppApiUser } from "@/lib/auth";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return withApi(async () => jsonOk(await getProjectsTree()));
+  return withApi(async () => {
+    await requireAppApiUser();
+    return jsonOk(await getProjectsTree());
+  });
 }

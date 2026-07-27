@@ -166,6 +166,15 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
+-- ログインセッション（両システム共用の認証基盤。lib/auth/session.ts）
+-- 有効期限は持たない（無期限）。失効はログアウトによる行削除とアカウント停止のみ。
+CREATE TABLE IF NOT EXISTS sessions (
+    token      text PRIMARY KEY,   -- randomBytes(32) の base64url。推測不能なランダム値
+    user_id    text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);
+
 CREATE TABLE IF NOT EXISTS app_meta (
     key   text PRIMARY KEY,
     value text NOT NULL

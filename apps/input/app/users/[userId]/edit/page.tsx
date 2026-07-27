@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Topbar } from "@chiban/shared/components/Topbar";
 import { UserForm } from "@/components/user/UserForm";
 import { listUsers } from "@chiban/shared/lib/queries/users";
+import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +13,13 @@ export default async function UserEditPage({
   params: Promise<{ userId: string }>;
 }) {
   const { userId } = await params;
+  const authUser = await requireAppUser(`/users/${userId}/edit`);
   const users = await listUsers();
   const user = users.find((u) => u.id === userId);
   if (!user) notFound();
   return (
     <div className="grid h-screen grid-rows-[56px_1fr]">
-      <Topbar appName="案件入力システム" screen="ユーザーの編集" showReset={false} />
+      <Topbar user={authUser} appName="案件入力システム" screen="ユーザーの編集" showReset={false} />
       <div className="min-h-0 overflow-y-auto bg-[color:var(--app-bg)]">
         <UserForm user={user} />
       </div>

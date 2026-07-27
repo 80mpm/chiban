@@ -54,6 +54,7 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 
 **案件閲覧システム（`apps/viewer`・営業用・port 3000）**
 
+- **ログイン (`/login`)**: ログインID・パスワード（営業・事務の両ロール可）
 - **案件一覧 (`/`)**: 全案件を地図 + サイドリストで俯瞰するトップページ（編集導線なし・閲覧専用）
 - **案件詳細 (`/projects/[id]`)**: 公図風ビュー(左) + 地図(右) の左右半々ビュー。
   左ペインは土地の polygon から自動生成した公図風 SVG（白地・北上・地番/地権者/坪数ラベル付き）、
@@ -73,6 +74,7 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 
 | パス | 画面 |
 |---|---|
+| `/login` | ログイン（事務ロールのみ可） |
 | `/` | 案件一覧テーブル（行クリックで案件詳細へ。「＋ 新規案件」は作成ページへのリンク） |
 | `/projects/new` | 案件作成フォーム（案件名・概要のみ） |
 | `/projects/[id]` | **案件詳細ハブ**（読み取り専用。案件情報・領域マッププレビュー・公図+土地一覧テーブル・削除。`NEXT_PUBLIC_VIEWER_ORIGIN` があれば閲覧システムへの外部リンク） |
@@ -169,14 +171,36 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
   凡例は `ProjectAreaMap.tsx` の `YOUTO_LEGEND`（色→用途地域名）。ZENRIN は配色を公表していないため、
   実描画の色を GetFeatureInfo と突き合わせて採取した値（赤い細線は塗りでなく用途地域界の境界線）
 
+### 認証（両システム共用の認証基盤）
+
+- **自前 DB セッション**: `sessions` テーブル（token = randomBytes(32) base64url）+
+  httpOnly cookie（`chiban_session`・sameSite=lax・secure は本番のみ）。両アプリが同一 DB を
+  共有するためアカウント・セッションの正本は 1 箇所
+- **セッションは無期限**（ユーザー指定の運用方針）。失効は ①ログアウト ②アカウント停止
+  （is_active=false で既存セッションも即無効）のみ。cookie はブラウザ上限に合わせ約 400 日で発行
+- **ロール別アクセス**: 閲覧システム = 営業・事務の両方可 / 入力システム = 事務のみ
+  （`apps/*/lib/auth.ts` の `APP_ROLES`）
+- **保護範囲は全ページ + 全 API**。未ログインはページ 307 → `/login?next=元URL`、API 401。
+  例外は `/login` と `POST /api/auth/login` のみ。ページは各 page.tsx 冒頭の
+  `requireAppUser(nextPath)`、API は withApi 内の `requireAppApiUser()`（`lib/auth/guard.ts`）
+- タイル・用途地域 WMS 中継も 401 で保護するが、応答は CDN キャッシュ（s-maxage）されるため
+  直近にログインユーザーが取得した同一タイルはキャッシュヒットで返りうる（地図画像のみの
+  低リスクとして許容）
+- ログイン失敗は ID の存在を漏らさない共通文言の 401。停止中・ロール外は 403
+- パスワードは `lib/auth/password.ts`（crypto.scrypt）。ログイン画面は shared の `LoginForm`
+  （デモ用初期アカウントの案内付き）。Topbar にユーザー名・種別・ログアウトを表示
+
 ### データ API 一覧（`app/api/*` の Route Handler）
 
 各アプリは自分の画面が使う API のみを持つ（他アプリの API は呼ばない）。
+**`/api/auth/*` 以外はすべて要ログイン**（未ログイン 401）。
 
 **両アプリ共通**
 
 | メソッド・パス | 役割 |
 |---|---|
+| `POST /api/auth/login` | ログイン {loginId, password}（唯一の非保護 API）。成功でセッション cookie を設定 |
+| `POST /api/auth/logout` | セッション破棄 + cookie 削除 |
 | `GET /api/projects` | 全案件を lands・visits 込みのツリーで返す |
 | `POST /api/reset` | 案件・土地・訪問記録を破棄してサンプル再投入（筆マスタは残す） |
 | `GET /api/youto-wms` | 用途地域データ重畳 (ZENRIN `wms/youto`) の WMS GetMap 中継。Leaflet の WMS パラメータに `zis_*` 認証を付与して転送 |
@@ -457,6 +481,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
 | `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。初期 3 名を冪等シード（初期パスワード `demo1234`）。**`POST /api/reset` では消えない** |
+| `sessions` | token (PK), user_id (FK・CASCADE), created_at | ログインセッション（無期限。失効はログアウトと停止のみ） |
 
 - 案件・土地の削除はカスケード。numeric（容積率・面積）は postgres.js では文字列で返るため `serialize.ts` で数値化する
 - **面積は ㎡ 保存が正本**（`lands.area_m2`。登記の地積単位）。坪は表示専用の導出値で、
@@ -473,9 +498,8 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 
 - できること: 案件・土地のCRUD、ステータス変更、訪問記録追加（閲覧システム）、サンプルデータへのリセット、
   ユーザー管理（登録・停止/再開・パスワード再設定。入力システムの `/users`）
-- できないこと: 訪問記録の編集・削除（履歴のため不可）、ユーザーの削除（停止のみ）、
-  ログイン（認証基盤のセッション部分と合わせて後続 Issue #21/#2/#35 で実装予定。
-  現状はユーザー管理画面自体も未認証で開ける＝デモ前提）
+- できること（続き）: ログイン/ログアウト（両システム。全ページ・全 API を保護）
+- できないこと: 訪問記録の編集・削除（履歴のため不可）、ユーザーの削除（停止のみ）
 
 ## 技術的な注意点
 

@@ -2,10 +2,14 @@
 
 import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
 import { getParcelTowns } from "@chiban/shared/lib/queries/parcels";
+import { requireAppApiUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return withApi(async () => jsonOk(await getParcelTowns()));
+  return withApi(async () => {
+    await requireAppApiUser();
+    return jsonOk(await getParcelTowns());
+  });
 }

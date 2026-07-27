@@ -4,12 +4,14 @@
 
 import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
 import { getParcels, getParcelsByTown } from "@chiban/shared/lib/queries/parcels";
+import { requireAppApiUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   return withApi(async () => {
+    await requireAppApiUser();
     const url = new URL(req.url);
     const town = url.searchParams.get("town");
     if (town) {

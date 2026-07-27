@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Topbar } from "@chiban/shared/components/Topbar";
 import { OwnerForm } from "@/components/owner/OwnerForm";
 import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
+import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function BuildingOwnerEditPage({
   params: Promise<{ id: string; landId: string; buildingId: string; ownerIndex: string }>;
 }) {
   const { id, landId, buildingId, ownerIndex } = await params;
+  const user = await requireAppUser(`/projects/${id}/lands/${landId}/buildings/${buildingId}/owners/${ownerIndex}/edit`);
   const projects = await getProjectsTree();
   const proj = projects.find((p) => p.id === id);
   const land = proj?.lands?.find((l) => l.id === landId);
@@ -29,7 +31,7 @@ export default async function BuildingOwnerEditPage({
   }
   return (
     <div className="grid h-screen grid-rows-[56px_1fr]">
-      <Topbar appName="案件入力システム" screen="建物の地権者の編集" />
+      <Topbar user={user} appName="案件入力システム" screen="建物の地権者の編集" />
       <div className="min-h-0 overflow-y-auto bg-[color:var(--app-bg)]">
         <OwnerForm proj={proj} land={land} building={building} index={n} />
       </div>

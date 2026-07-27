@@ -2,27 +2,47 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { USER_ROLE_DEFS } from "@chiban/shared/lib/format";
+import type { User } from "@chiban/shared/lib/types";
 
 /**
  * 全画面共通のトップバー（旧 topbar.css）。
- * 構造: h1（システム名リンク + 画面名 + DEMO バッジ）→ サンプルデータに戻す
+ * 構造: h1（システム名リンク + 画面名 + DEMO バッジ）→ ユーザー名 + ログアウト → サンプルデータに戻す
  *
  * @param screen 画面名（「案件一覧」「案件編集」など）
  * @param appName システム名（既定は「案件管理システム」。入力システムでは「案件入力システム」）
+ * @param user ログイン中のユーザー（渡すと氏名・種別とログアウトボタンを表示）
  */
 export function Topbar({
   screen,
   showReset = true,
   appName = "案件管理システム",
+  user,
 }: {
   screen: string;
   showReset?: boolean;
   appName?: string;
+  user?: User;
 }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [resetting, setResetting] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/login");
+      router.refresh();
+    } catch {
+      toast.error("ログアウトに失敗しました");
+      setLoggingOut(false);
+    }
+  }
 
   async function handleReset() {
     if (
@@ -69,6 +89,25 @@ export function Topbar({
           DEMO
         </span>
       </h1>
+
+      {user && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-white/85">
+            {user.name}
+            <span className="ml-1 rounded bg-white/15 px-1.5 py-0.5 text-[10px]">
+              {USER_ROLE_DEFS[user.role].label}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="cursor-pointer rounded-md border border-white/25 bg-white/[.06] px-2.5 py-1 text-xs text-white/85 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loggingOut ? "ログアウト中…" : "ログアウト"}
+          </button>
+        </div>
+      )}
 
       {showReset && (
         <button

@@ -3,12 +3,17 @@
 // そのまま引き継ぎ、ログイン認証の zis_* をサーバ側で付与して PNG を返す。
 
 import { fetchYoutoWms } from "@chiban/shared/lib/zenrin";
+import { getCurrentUser } from "@/lib/auth";
 
 // セッションキャッシュをプロセス内で保持したいので Node ランタイム。
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  // 未ログインには ZENRIN 中継を使わせない（画像応答のため withApi は通さず直接 401）
+  if (!(await getCurrentUser())) {
+    return new Response("ログインが必要です", { status: 401 });
+  }
   const { searchParams } = new URL(req.url);
   try {
     return await fetchYoutoWms(searchParams);
