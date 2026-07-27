@@ -101,13 +101,19 @@ export async function createUser(fields: {
 
 /**
  * ユーザーの部分更新（JSON に含まれたキーのみ反映）。
- * - name / role / isActive の変更
+ * - loginId / name / role / isActive の変更（loginId は UNIQUE 制約で重複 409。
+ *   主キーはサロゲートキーのためログインIDを変えてもアカウントの同一性は保たれる）
  * - password キーがあればパスワード再設定（再ハッシュ）
- * ログインID は変更不可（アカウントの同一性を保つ）。
  */
 export async function updateUser(
   userId: string,
-  fields: { name?: string; role?: string; isActive?: boolean; password?: string },
+  fields: {
+    loginId?: string;
+    name?: string;
+    role?: string;
+    isActive?: boolean;
+    password?: string;
+  },
 ): Promise<User> {
   await ensureDbReady();
 
@@ -118,6 +124,11 @@ export async function updateUser(
     sets.push(`${fragment}$${params.length}`);
   };
 
+  if ("loginId" in fields) {
+    const loginId = (fields.loginId ?? "").trim();
+    validateLoginId(loginId);
+    add("login_id = ", loginId);
+  }
   if ("name" in fields) {
     const name = (fields.name ?? "").trim();
     if (!name) throw new ApiError(400, "氏名は必須です");
@@ -140,12 +151,19 @@ export async function updateUser(
   if (sets.length === 0) throw new ApiError(400, "更新する項目がありません");
 
   params.push(userId);
-  const rows = await sql.unsafe<UserRow[]>(
-    `UPDATE users SET ${sets.join(", ")}, updated_at = now()
-      WHERE id = $${params.length}
-      RETURNING ${USER_COLUMNS}`,
-    params as never[],
-  );
-  if (rows.length === 0) throw new ApiError(404, "ユーザーが見つかりません");
-  return userJson(rows[0]);
+  try {
+    const rows = await sql.unsafe<UserRow[]>(
+      `UPDATE users SET ${sets.join(", ")}, updated_at = now()
+        WHERE id = $${params.length}
+        RETURNING ${USER_COLUMNS}`,
+      params as never[],
+    );
+    if (rows.length === 0) throw new ApiError(404, "ユーザーが見つかりません");
+    return userJson(rows[0]);
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      throw new ApiError(409, "このログインIDは既に使われています");
+    }
+    throw e;
+  }
 }

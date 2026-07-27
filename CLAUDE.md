@@ -90,7 +90,7 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 | `.../buildings/[buildingId]/owners/...`・`mortgages/...` | 建物の地権者・抵当権の行単位ページ（土地側と同型） |
 | `/users` | ユーザー管理（一覧。種別フィルタタブ「すべて/営業/事務」= Issue #22/#23。案件一覧ヘッダから遷移） |
 | `/users/new` | ユーザー登録（ログインID・氏名・種別・初期パスワード） |
-| `/users/[userId]/edit` | ユーザー編集（氏名・種別。ログインIDは変更不可）+ 停止/再開ボタン |
+| `/users/[userId]/edit` | ユーザー編集（ログインID〔重複不可〕・氏名・種別）+ 停止/再開ボタン |
 | `/users/[userId]/password` | パスワード再設定（管理者が直接設定するデモ方式） |
 
 行単位ページの保存はすべて「配列を再構築して PATCH で全置換」（追加=末尾・編集=index 差し替え・
@@ -203,7 +203,7 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
 | `DELETE /api/projects/:id/lands/:landId` | 土地削除 |
 | `GET /api/users` | 全ユーザー（password_hash は決して返さない） |
 | `POST /api/users` | ユーザー登録 {loginId, name, role, password}（loginId 重複 409） |
-| `PATCH /api/users/:userId` | ユーザーの部分更新 {name?, role?, isActive?, password?}（password でパスワード再設定。削除 API は無し・停止 = isActive:false） |
+| `PATCH /api/users/:userId` | ユーザーの部分更新 {loginId?, name?, role?, isActive?, password?}（loginId 変更可・重複 409。password でパスワード再設定。削除 API は無し・停止 = isActive:false） |
 
 エラーは `lib/api-error.ts` の `ApiError(status, 日本語message)` を `withApi()` で
 `Response.json({error}, {status})` に変換する。DB 接続不能は 503、UNIQUE 違反は 409。

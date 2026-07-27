@@ -25,7 +25,7 @@ const PASSWORD_MIN = 8;
 /**
  * ユーザーの登録/編集共用フォーム。
  * - 登録: ログインID・氏名・種別・初期パスワード（確認付き）
- * - 編集: 氏名・種別のみ（ログインIDは変更不可。パスワードは専用ページで再設定）。
+ * - 編集: ログインID（重複不可）・氏名・種別（パスワードは専用ページで再設定）。
  *   停止/再開ボタンもこのページに置く
  */
 export function UserForm({ user }: { user?: User }) {
@@ -49,12 +49,12 @@ export function UserForm({ user }: { user?: User }) {
       setError("氏名は必須です");
       return;
     }
+    const loginIdT = loginId.trim();
+    if (!LOGIN_ID_RE.test(loginIdT)) {
+      setError("ログインIDは 3〜32 文字の半角英数字・ハイフン・アンダースコアで入力してください");
+      return;
+    }
     if (isCreate) {
-      const loginIdT = loginId.trim();
-      if (!LOGIN_ID_RE.test(loginIdT)) {
-        setError("ログインIDは 3〜32 文字の半角英数字・ハイフン・アンダースコアで入力してください");
-        return;
-      }
       if (password.length < PASSWORD_MIN) {
         setError(`初期パスワードは ${PASSWORD_MIN} 文字以上で入力してください`);
         return;
@@ -69,7 +69,7 @@ export function UserForm({ user }: { user?: User }) {
       });
       return;
     }
-    await submit(() => updateUser(user.id, { name: nameT, role }), {
+    await submit(() => updateUser(user.id, { loginId: loginIdT, name: nameT, role }), {
       successMessage: "ユーザーを保存しました",
       redirectTo: backHref,
     });
@@ -125,22 +125,16 @@ export function UserForm({ user }: { user?: User }) {
         <div className="space-y-3">
           <div className={fieldCls}>
             <Label htmlFor="loginId" className="text-xs">
-              ログインID {isCreate && <span className="text-destructive">*</span>}
+              ログインID <span className="text-destructive">*</span>
             </Label>
-            {isCreate ? (
-              <Input
-                id="loginId"
-                value={loginId}
-                onChange={(e) => setLoginId(e.target.value)}
-                placeholder="例：kimura（半角英数と - _）"
-                autoFocus
-                className="max-w-72 font-mono"
-              />
-            ) : (
-              <div className="font-mono text-sm text-muted-foreground">
-                {user.loginId}（変更できません）
-              </div>
-            )}
+            <Input
+              id="loginId"
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value)}
+              placeholder="例：kimura（半角英数と - _）"
+              autoFocus={isCreate}
+              className="max-w-72 font-mono"
+            />
           </div>
 
           <div className={fieldCls}>

@@ -117,7 +117,13 @@ export const createUser = (fields: {
 
 export const updateUser = (
   userId: string,
-  fields: { name?: string; role?: UserRole; isActive?: boolean; password?: string },
+  fields: {
+    loginId?: string;
+    name?: string;
+    role?: UserRole;
+    isActive?: boolean;
+    password?: string;
+  },
 ) => api<User>("PATCH", `/api/users/${encodeURIComponent(userId)}`, fields);
 
 // ----- リセット -----
