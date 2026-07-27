@@ -49,7 +49,12 @@ export default function ProjectListMap({
     addBaseTileLayer(map);
     mapRef.current = map;
     setTimeout(() => map.invalidateSize(), 0);
+    // モバイルの地図/リスト切替（display:none → 再表示）や画面回転で
+    // コンテナサイズが変わっても Leaflet が追従できるようにする
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(el);
     return () => {
+      observer.disconnect();
       map.remove();
       mapRef.current = null;
     };

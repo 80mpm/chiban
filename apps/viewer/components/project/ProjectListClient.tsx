@@ -24,6 +24,8 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
   const { data: projects = [] } = useProjects(initialProjects);
   const [searchTarget, setSearchTarget] = useState<LatLng | null>(null);
   const [searching, setSearching] = useState(false);
+  // モバイル（md 未満）は地図/リストをタブで全画面切替する。PC は 2 カラムで常時両方表示
+  const [mobileView, setMobileView] = useState<"map" | "list">("map");
 
   const goToDetail = (id: string) =>
     router.push(`/projects/${encodeURIComponent(id)}`);
@@ -58,13 +60,13 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
   }
 
   return (
-    <main className="grid min-h-0 grid-cols-[1fr_340px]">
-      {/* 地図エリア */}
-      <div className="relative min-h-0">
+    <main className="relative min-h-0 md:grid md:grid-cols-[1fr_340px]">
+      {/* 地図エリア（モバイルは「地図」タブのときのみ表示） */}
+      <div className={`relative h-full min-h-0 ${mobileView === "map" ? "block" : "hidden"} md:block`}>
         <form
           onSubmit={handleSearch}
           autoComplete="off"
-          className="absolute left-3 top-3 z-[500] w-72"
+          className="absolute left-3 right-3 top-3 z-[500] sm:right-auto sm:w-72"
         >
           <input
             name="q"
@@ -81,8 +83,12 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
         />
       </div>
 
-      {/* サイドリスト */}
-      <aside className="flex min-h-0 flex-col border-l border-border bg-[color:var(--app-surface)]">
+      {/* サイドリスト（モバイルは「リスト」タブのときのみ全画面表示） */}
+      <aside
+        className={`min-h-0 flex-col border-border bg-[color:var(--app-surface)] md:border-l ${
+          mobileView === "list" ? "flex" : "hidden"
+        } md:flex`}
+      >
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
           <div>
             <h2 className="text-[15px] font-semibold text-[color:var(--app-text-dark)]">
@@ -92,7 +98,7 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3">
+        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3 pb-20 md:pb-3">
           {projects.length === 0 ? (
             <div className="px-2 py-10 text-center text-sm text-muted-foreground">
               案件がありません。
@@ -137,6 +143,31 @@ export function ProjectListClient({ initialProjects }: { initialProjects: Projec
           )}
         </div>
       </aside>
+
+      {/* モバイル用の地図/リスト切替トグル（Leaflet コントロールより上に置く） */}
+      <div className="absolute bottom-4 left-1/2 z-[600] -translate-x-1/2 md:hidden">
+        <div className="flex overflow-hidden rounded-full border border-border bg-white shadow-lg">
+          {(
+            [
+              { key: "map", label: "地図" },
+              { key: "list", label: `リスト（${projects.length}）` },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setMobileView(t.key)}
+              className={`px-5 py-2.5 text-sm font-medium ${
+                mobileView === t.key
+                  ? "bg-brand text-white"
+                  : "bg-white text-[color:var(--app-text-dark)]"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </main>
   );
 }

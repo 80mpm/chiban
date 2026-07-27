@@ -31,6 +31,7 @@ export function Topbar({
   const queryClient = useQueryClient();
   const [resetting, setResetting] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -76,22 +77,24 @@ export function Topbar({
   }
 
   return (
-    <header className="z-10 flex h-14 flex-none items-center gap-3 bg-header px-5 text-white shadow-[0_1px_4px_rgba(0,0,0,.15)]">
-      <h1 className="flex-1 text-[15px] font-semibold">
+    <header className="relative z-10 flex h-14 flex-none items-center gap-3 bg-header px-4 text-white shadow-[0_1px_4px_rgba(0,0,0,.15)] sm:px-5">
+      <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold">
         <Link
           href="/"
           className="-mx-1.5 -my-0.5 rounded px-1.5 py-0.5 text-inherit no-underline transition-colors hover:bg-white/10"
         >
           {appName}
-        </Link>{" "}
-        — {screen}{" "}
+        </Link>
+        {/* 画面名は狭幅では省略する（システム名 + DEMO は常に出す） */}
+        <span className="hidden sm:inline"> — {screen}</span>{" "}
         <span className="ml-2 inline-block rounded-lg bg-badge px-[7px] py-0.5 align-middle text-[10px] font-medium">
           DEMO
         </span>
       </h1>
 
+      {/* PC（md〜）: 従来どおり横並び */}
       {user && (
-        <div className="flex items-center gap-2 text-xs">
+        <div className="hidden items-center gap-2 text-xs md:flex">
           <span className="text-white/85">
             {user.name}
             <span className="ml-1 rounded bg-white/15 px-1.5 py-0.5 text-[10px]">
@@ -114,10 +117,63 @@ export function Topbar({
           type="button"
           onClick={handleReset}
           disabled={resetting}
-          className="cursor-pointer rounded-md border border-[rgba(248,113,113,.35)] bg-white/[.06] px-3 py-1.5 text-xs text-[#fecaca] transition-colors hover:bg-[rgba(248,113,113,.15)] hover:text-[#fca5a5] disabled:cursor-not-allowed disabled:opacity-60"
+          className="hidden cursor-pointer rounded-md border border-[rgba(248,113,113,.35)] bg-white/[.06] px-3 py-1.5 text-xs text-[#fecaca] transition-colors hover:bg-[rgba(248,113,113,.15)] hover:text-[#fca5a5] disabled:cursor-not-allowed disabled:opacity-60 md:block"
         >
           {resetting ? "リセット中…" : "サンプルデータに戻す"}
         </button>
+      )}
+
+      {/* モバイル（md 未満）: ユーザー操作を ⋮ メニューに集約 */}
+      {(user || showReset) && (
+        <div className="md:hidden">
+          <button
+            type="button"
+            aria-label="メニュー"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex size-9 items-center justify-center rounded-md border border-white/25 bg-white/[.06] text-lg leading-none hover:bg-white/15"
+          >
+            ⋮
+          </button>
+          {menuOpen && (
+            <>
+              {/* 背面クリックで閉じる */}
+              <div className="fixed inset-0 z-[690]" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-3 top-[52px] z-[700] w-56 rounded-lg border border-border bg-white py-1.5 text-[color:var(--app-text-dark)] shadow-lg">
+                {user && (
+                  <div className="border-b border-border px-3 py-2 text-sm">
+                    {user.name}
+                    <span className="ml-1.5 rounded bg-[color:var(--app-bg)] px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {USER_ROLE_DEFS[user.role].label}
+                    </span>
+                  </div>
+                )}
+                {user && (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    disabled={loggingOut}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-[color:var(--app-bg)] disabled:opacity-60"
+                  >
+                    {loggingOut ? "ログアウト中…" : "ログアウト"}
+                  </button>
+                )}
+                {showReset && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      handleReset();
+                    }}
+                    disabled={resetting}
+                    className="block w-full px-3 py-2 text-left text-sm text-[#dc2626] hover:bg-[#fef2f2] disabled:opacity-60"
+                  >
+                    {resetting ? "リセット中…" : "サンプルデータに戻す"}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       )}
     </header>
   );
