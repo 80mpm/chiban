@@ -97,6 +97,8 @@ export function ProjectDetailClient({
   const { data: projects = [] } = useProjects(initialProjects);
   const proj = projects.find((p) => p.id === projectId);
   const [selectedLandId, setSelectedLandId] = useState<string | null>(null);
+  // モバイル（md 未満）は公図/地図をタブで全画面切替する。PC は左右半々で常時両方表示
+  const [mobileView, setMobileView] = useState<"kouzu" | "map">("kouzu");
 
   if (!proj) {
     return (
@@ -110,9 +112,13 @@ export function ProjectDetailClient({
   const selectedLand = lands.find((l) => l.id === selectedLandId) ?? null;
 
   return (
-    <div className="flex min-h-0 flex-1">
-      {/* 左: 公図風ビュー */}
-      <div className="relative min-w-0 flex-1 border-r-2 border-[#d4dde6] bg-[#f1f5f9]">
+    <div className="relative flex min-h-0 flex-1">
+      {/* 左: 公図風ビュー（モバイルは「公図」タブのときのみ表示） */}
+      <div
+        className={`relative min-w-0 flex-1 bg-[#f1f5f9] md:border-r-2 md:border-[#d4dde6] ${
+          mobileView === "kouzu" ? "block" : "hidden"
+        } md:block`}
+      >
         <div className="kouzu-host absolute inset-0 border-0">
           <KouzuView
             lands={lands}
@@ -122,12 +128,43 @@ export function ProjectDetailClient({
         </div>
       </div>
 
-      {/* 右: 地図 + 土地詳細オーバーレイ */}
-      <div className="relative min-w-0 flex-1 bg-[#eef2f7]">
+      {/* 右: 地図（モバイルは「地図」タブのときのみ表示） */}
+      <div
+        className={`relative min-w-0 flex-1 bg-[#eef2f7] ${
+          mobileView === "map" ? "block" : "hidden"
+        } md:block`}
+      >
         <ProjectAreaMap project={proj} />
+      </div>
 
-        {selectedLand && (
-          <div className="absolute inset-0 z-[1001] overflow-y-auto bg-white p-4 text-xs text-[#1e293b] shadow-[-2px_0_10px_rgba(0,0,0,.1)]">
+      {/* モバイル用の公図/地図切替トグル（土地詳細（z-1001）が開いている間は下に隠れる） */}
+      <div className="absolute bottom-4 left-1/2 z-[600] -translate-x-1/2 md:hidden">
+        <div className="flex overflow-hidden rounded-full border border-border bg-white shadow-lg">
+          {(
+            [
+              { key: "kouzu", label: "公図" },
+              { key: "map", label: "地図" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setMobileView(t.key)}
+              className={`px-6 py-2.5 text-sm font-medium ${
+                mobileView === t.key
+                  ? "bg-brand text-white"
+                  : "bg-white text-[color:var(--app-text-dark)]"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 土地詳細オーバーレイ: モバイルは全画面、PC は右半分（md:left-1/2） */}
+      {selectedLand && (
+        <div className="absolute inset-0 z-[1001] overflow-y-auto bg-white p-4 text-xs text-[#1e293b] shadow-[-2px_0_10px_rgba(0,0,0,.1)] md:left-1/2">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h4 className="flex-1 text-[15px] font-bold text-[#21295c]">
                 地番 {[selectedLand.aza, selectedLand.chiban].filter(Boolean).join(" ") || "—"}
@@ -220,9 +257,8 @@ export function ProjectDetailClient({
             )}
 
             <VisitAddForm projectId={proj.id} landId={selectedLand.id} />
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

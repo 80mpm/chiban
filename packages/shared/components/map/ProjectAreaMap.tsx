@@ -65,6 +65,10 @@ export default function ProjectAreaMap({ project }: { project: Project }) {
       });
     }
     setTimeout(() => map.invalidateSize(), 0);
+    // モバイルのタブ切替（display:none → 再表示）や画面回転でコンテナサイズが
+    // 変わっても Leaflet が追従できるようにする
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(el);
 
     const pts = project.polygon;
     if (Array.isArray(pts) && pts.length >= 3) {
@@ -104,6 +108,7 @@ export default function ProjectAreaMap({ project }: { project: Project }) {
     }
 
     return () => {
+      observer.disconnect();
       map.remove();
       mapRef.current = null;
       youtoRef.current = null;
