@@ -6,7 +6,7 @@ import { DocumentsCard } from "@/components/document/DocumentsCard";
 import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { OwnersList, MortgagesList } from "@/components/land/LandDetailView";
 import { updateLand } from "@chiban/shared/lib/data-client";
-import { fmtDateOnly } from "@chiban/shared/lib/format";
+import { fmtDateOnly, RESIDENT_OWNER_MATCH_DEFS } from "@chiban/shared/lib/format";
 import type { Project, Land, Building } from "@chiban/shared/lib/types";
 
 const dash = (s: string | null | undefined) => (s ? s : "—");
@@ -24,6 +24,8 @@ export function BuildingDetailView({
 }) {
   const landBase = `/projects/${proj.id}/lands/${land.id}`;
   const base = `${landBase}/buildings/${encodeURIComponent(building.id)}`;
+  const match =
+    RESIDENT_OWNER_MATCH_DEFS[building.residentOwnerMatch] ?? RESIDENT_OWNER_MATCH_DEFS.unknown;
   const title = building.kaokuNumber ? `建物（家屋番号 ${building.kaokuNumber}）` : "建物";
 
   return (
@@ -52,6 +54,15 @@ export function BuildingDetailView({
           <dd className="text-sm">{building.floorArea != null ? `${building.floorArea} ㎡` : "—"}</dd>
           <dt className="text-[11px] text-muted-foreground">新築年月日</dt>
           <dd className="text-sm">{building.builtDate ? fmtDateOnly(building.builtDate) : "—"}</dd>
+          <dt className="text-[11px] text-muted-foreground">居住者と所有者</dt>
+          <dd className="text-sm">
+            <span
+              className="rounded-lg px-2 py-0.5 text-xs font-medium text-white"
+              style={{ background: match.color }}
+            >
+              {match.label}
+            </span>
+          </dd>
           <dt className="text-[11px] text-muted-foreground">備考</dt>
           <dd className="whitespace-pre-wrap break-words text-sm">{dash(building.description)}</dd>
         </dl>

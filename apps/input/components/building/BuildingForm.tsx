@@ -7,14 +7,22 @@ import { useFormSubmit } from "@/components/form/use-form-submit";
 import { Input } from "@chiban/shared/components/ui/input";
 import { Textarea } from "@chiban/shared/components/ui/textarea";
 import { Label } from "@chiban/shared/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@chiban/shared/components/ui/select";
 import { updateLand } from "@chiban/shared/lib/data-client";
-import type { Project, Land, Building } from "@chiban/shared/lib/types";
+import { RESIDENT_OWNER_MATCH_DEFS, RESIDENT_OWNER_MATCH_KEYS } from "@chiban/shared/lib/format";
+import type { Project, Land, Building, ResidentOwnerMatch } from "@chiban/shared/lib/types";
 
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
 
 /**
  * 建物の基本情報の作成/編集フォーム（所在・家屋番号・構造・種類・延床面積・
- * 新築年月日・備考のみ）。地権者・抵当権は建物詳細ページの行単位ページで編集する。
+ * 新築年月日・居住者と所有者の一致・備考のみ）。地権者・抵当権は建物詳細ページの行単位ページで編集する。
  *
  * API は建物単体のエンドポイントを持たないため、土地の buildings 配列を再構築して
  * PATCH {buildings} で全置換する（既存建物は id ごと再送されるため id は安定）。
@@ -41,6 +49,9 @@ export function BuildingForm({
   );
   const [builtDate, setBuiltDate] = useState(building?.builtDate ?? "");
   const [description, setDescription] = useState(building?.description ?? "");
+  const [residentOwnerMatch, setResidentOwnerMatch] = useState<ResidentOwnerMatch>(
+    building?.residentOwnerMatch ?? "unknown",
+  );
 
   const landBase = `/projects/${proj.id}/lands/${land.id}`;
   const backHref = isCreate
@@ -69,6 +80,7 @@ export function BuildingForm({
       floorArea: area,
       builtDate,
       description: description.trim(),
+      residentOwnerMatch,
       // 追加時は空、編集時は既存の地権者・抵当権を維持して再送する
       owners: building?.owners ?? [],
       mortgages: building?.mortgages ?? [],
@@ -171,6 +183,24 @@ export function BuildingForm({
               onChange={(e) => setBuiltDate(e.target.value)}
               className="max-w-56"
             />
+          </div>
+          <div className={fieldCls}>
+            <Label className="text-xs">居住者と所有者</Label>
+            <Select
+              value={residentOwnerMatch}
+              onValueChange={(v) => setResidentOwnerMatch(v as ResidentOwnerMatch)}
+            >
+              <SelectTrigger className="w-40" aria-label="居住者と所有者の一致">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {RESIDENT_OWNER_MATCH_KEYS.map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {RESIDENT_OWNER_MATCH_DEFS[k].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-[112px_1fr] items-start gap-x-3">
             <Label htmlFor="description" className="pt-2 text-xs">備考</Label>

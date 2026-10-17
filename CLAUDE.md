@@ -485,13 +485,19 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
            description, areaM2, areaTsubo, mortgages[{date, amount, holder}], status,
            createdAt, updatedAt, polygon[[lat,lng]], visits[], buildings[],
            documents[{id, kind, fileName, contentType, byteSize, uploadedBy, createdAt, updatedAt}] }
-      └ Visit { id, user, comment, date, directOrTel, meetingType, nextDate, progress, principal }
+      ├ Visit { id, user, comment, date, directOrTel, meetingType, nextDate, progress, principal }
+      └ Building { id, location, kaokuNumber, structure, usage, floorArea, builtDate, description,
+                   residentOwnerMatch, owners[], mortgages[], documents[], createdAt, updatedAt }
 ```
 
 - `parcelId` が筆マスタ（parcels.id）への参照で、土地の所在の正本。`aza` / `chiban` / `polygon` は
   マスタからの導出値（API が読み出しのたびに parcels・chibankuiki から再導出。lands には保存しない）
 - `owners[{name, share}]` は `land_owners` テーブルに正規化（share は `'分子/分母'` 文字列、持分なしは `''`）。
   API は読み出し時に追加順で集約して返し、更新時は土地ごとに全置換する
+- `Building.residentOwnerMatch` は居住者と所有者（建物の地権者）の一致を 3 値で持つ
+  （`match`=一致 / `mismatch`=不一致 / `unknown`=未確認。既存・未送信は `unknown`）。表示ラベルと色は
+  `lib/format.ts` の `RESIDENT_OWNER_MATCH_DEFS`。入力システムの建物フォームで設定し、建物詳細ハブと
+  閲覧システムの土地詳細（建物情報）に表示する（閲覧は表示のみ）
 - **ID は意味を持たないサロゲートキー**。住所マスタ・筆マスタの id は IDENTITY の連番、
   JIS コード・町名・地番はただの属性 + UNIQUE 制約。ID に業務情報を埋め込まない
 - 案件・土地ともに緯度経度ポリゴンを持つ。**町名＋地番は登記制度上一意**
@@ -508,6 +514,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `projects` | id (IDENTITY), name, description, polygon (jsonb), address, access, current_far, target_far, front_roads (jsonb), created_at, updated_at | 案件。API では id を文字列で返す |
 | `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_m2, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)`。地権者は `land_owners`、抵当権は `land_mortgages` に正規化 |
 | `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
+| `buildings` | id (`id_xxxx`), land_id (FK), location, kaoku_number, structure, usage, floor_area, built_date, description, resident_owner_match, created_at, updated_at | 建物（土地の子）。`resident_owner_match` は `CHECK` で `'match'/'mismatch'/'unknown'` に限定（既定 `'unknown'`。既存 DB には `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` で追随）。地権者は `building_owners`、抵当権は `building_mortgages` に正規化 |
 | `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), kind ('registry'/'kouzu'), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK` で土地・建物のどちらか一方にだけ紐づくことを担保。`kind` は種別（既定 `'registry'` = 登記簿・`'kouzu'` = 公図。2026-10 に `ADD COLUMN IF NOT EXISTS` で追加し既存行は登記簿扱い）。公図は建物にのみ添付でき、土地の読み出しは登記簿だけを返す。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
 | `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。デモアカウント **`id` / `pass`**（種別=事務なので閲覧・入力の両方に入れる）は既存 DB にも毎回冪等に用意する。氏名入りの初期アカウント（honda=営業・パスワード `demo1234`）は users が空のときだけ投入（kimura・sato は廃止）。**`POST /api/reset` では消えない** |
