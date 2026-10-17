@@ -108,7 +108,7 @@ function building(
   usage: string,
   floorArea: number | null,
   owners: Owner[],
-  extras: Partial<Pick<SampleBuilding, "builtDate" | "description" | "mortgages">> = {},
+  extras: Partial<Pick<SampleBuilding, "builtDate" | "description" | "mortgages" | "residentOwnerMatch">> = {},
 ): SampleBuilding {
   return {
     location,
@@ -119,6 +119,7 @@ function building(
     owners,
     builtDate: "",
     description: "",
+    residentOwnerMatch: "unknown",
     mortgages: [],
     ...extras,
   };
@@ -127,7 +128,7 @@ function building(
 /** サンプル建物（id は投入時に採番するため持たない）。 */
 type SampleBuilding = Pick<
   Building,
-  "location" | "kaokuNumber" | "structure" | "usage" | "floorArea" | "builtDate" | "description" | "owners" | "mortgages"
+  "location" | "kaokuNumber" | "structure" | "usage" | "floorArea" | "builtDate" | "description" | "residentOwnerMatch" | "owners" | "mortgages"
 >;
 
 interface SampleLand {
@@ -257,7 +258,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
             "居宅",
             96.52,
             [owner("安野政子", "", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続")],
-            { builtDate: "1972-08-31" },
+            { builtDate: "1972-08-31", residentOwnerMatch: "match" },
           ),
         ],
         visits: [
@@ -285,6 +286,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
             [owner("中嶋直美", "", "東京都台東区西浅草二丁目23番1号", "2013-06-27", "売買")],
             {
               builtDate: "1969-08-05",
+              residentOwnerMatch: "mismatch",
               mortgages: [mortgage("2013-06-03", 3860, "XYZ信用金庫")],
             },
           ),

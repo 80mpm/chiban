@@ -9,6 +9,9 @@ export type LatLng = [number, number];
 /** ステータス（target=対象 / acquired=取得済）。 */
 export type LandStatus = "target" | "acquired";
 
+/** 居住者と所有者（建物の地権者）の一致（match=一致 / mismatch=不一致 / unknown=未確認）。 */
+export type ResidentOwnerMatch = "match" | "mismatch" | "unknown";
+
 /** 地権者。share は「分子/分母」文字列、持分なしは空文字。 */
 export interface Owner {
   name: string;
@@ -68,6 +71,8 @@ export interface Building {
   builtDate: string;
   /** 備考。 */
   description: string;
+  /** 居住者と所有者（建物の地権者）が一致しているか。既定は未確認。 */
+  residentOwnerMatch: ResidentOwnerMatch;
   /** 建物の地権者。 */
   owners: Owner[];
   /** 抵当権。 */

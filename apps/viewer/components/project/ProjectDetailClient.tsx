@@ -8,13 +8,14 @@ import { useProjects } from "@chiban/shared/hooks/use-projects";
 import {
   STATUS_DEFS,
   formatBuilding,
+  RESIDENT_OWNER_MATCH_DEFS,
   formatMortgage,
   formatRegistration,
   fmtDateTime,
   fmtDateOnly,
   fmtTsubo,
 } from "@chiban/shared/lib/format";
-import type { Project, Visit, Owner, Mortgage } from "@chiban/shared/lib/types";
+import type { Project, Visit, Owner, Mortgage, ResidentOwnerMatch } from "@chiban/shared/lib/types";
 
 const ProjectAreaMap = dynamic(() => import("@chiban/shared/components/map/ProjectAreaMap"), {
   ssr: false,
@@ -57,6 +58,22 @@ function MortgageList({ mortgages }: { mortgages: Mortgage[] | undefined }) {
       {mortgages.map((m, i) => (
         <div key={i}>{formatMortgage(m) || "—"}</div>
       ))}
+    </div>
+  );
+}
+
+/** 建物の「居住者と所有者の一致」を色付きバッジで 1 行表示する（閲覧のみ）。 */
+function ResidentOwnerMatchLine({ value }: { value: ResidentOwnerMatch | undefined }) {
+  const def = RESIDENT_OWNER_MATCH_DEFS[value ?? "unknown"] ?? RESIDENT_OWNER_MATCH_DEFS.unknown;
+  return (
+    <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+      <span className="text-[#64748b]">居住者と所有者：</span>
+      <span
+        className="rounded px-1.5 py-px text-[10px] font-medium text-white"
+        style={{ background: def.color }}
+      >
+        {def.label}
+      </span>
     </div>
   );
 }
@@ -227,6 +244,7 @@ export function ProjectDetailClient({
                         {fmtDateOnly(b.builtDate)}新築
                       </div>
                     )}
+                    <ResidentOwnerMatchLine value={b.residentOwnerMatch} />
                     <div className="mt-1 text-[11px]">
                       <div className="text-[#64748b]">建物の地権者：</div>
                       <OwnerList owners={b.owners} />
