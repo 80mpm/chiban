@@ -1,0 +1,24 @@
+# Vercel CLI アップロード除外（.gitignore の代わりに使われるため網羅的に書く）
+# 注意: 先頭 / なしのパターンは任意階層にマッチする（components/kouzu/ 等を
+# 巻き込まないよう、リポジトリ直下のものは必ず / で始める）
+node_modules
+.next
+.git
+.venv
+__pycache__
+.vercel
+
+# 資格情報・環境変数ファイル（絶対にアップロードしない）
+/env
+.env
+.env.*
+/zenrin.pdf
+
+# デプロイに不要な大きなディレクトリ（リポジトリ直下のみ）
+/docs
+/kouzu
+/tools
+/.claude
+/HANDOFF.md
+/tsconfig.tsbuildinfo
+next-env.d.ts

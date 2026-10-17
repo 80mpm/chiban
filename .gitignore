@@ -23,3 +23,5 @@ __pycache__/
 /docs/
 .DS_Store
 .vercel
+# Vercel 環境変数設定時に作られた資格情報ファイル（コミット厳禁）
+/env

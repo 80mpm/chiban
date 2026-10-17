@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "@chiban/shared/styles/shared.css";
+/* Tailwind v4 の自動ソース検出はアプリディレクトリ起点かつ node_modules 除外のため、
+   共有パッケージ内コンポーネントの className を明示的にスキャン対象へ追加する */
+@source "../../../packages/shared";
