@@ -93,6 +93,15 @@ export function BuildingDetailView({
         documents={building.documents}
       />
 
+      <DocumentsCard
+        title="公図"
+        projectId={proj.id}
+        landId={land.id}
+        buildingId={building.id}
+        kind="kouzu"
+        documents={building.documents}
+      />
+
       <div className="flex justify-end">
         <ConfirmDeleteButton
           label="この建物を削除"

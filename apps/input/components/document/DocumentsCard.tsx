@@ -11,14 +11,15 @@ import {
   documentsPath,
 } from "@chiban/shared/lib/data-client";
 import { fmtBytes, fmtDateTime } from "@chiban/shared/lib/format";
-import type { RegistryDocument } from "@chiban/shared/lib/types";
+import type { DocumentKind, RegistryDocument } from "@chiban/shared/lib/types";
 
 /** 受け付けるファイル種別（サーバ側の ALLOWED_DOCUMENT_TYPES と対応）。 */
 const ACCEPT = "application/pdf,image/jpeg,image/png";
 
 /**
  * 登記簿等の添付ファイルのカード（土地・建物共用）。
- * buildingId を渡すと建物の登記簿になる。保存後は router.refresh() で
+ * buildingId を渡すと建物の添付になる。kind（既定 registry=登記簿）で種別を選び、
+ * documents のうちその種別のものだけを表示・追加する（建物は登記簿と公図の 2 枚並べる）。保存後は router.refresh() で
  * サーバコンポーネントを読み直す（入力システムはキャッシュを持たない方針）。
  */
 export function DocumentsCard({
@@ -26,12 +27,14 @@ export function DocumentsCard({
   projectId,
   landId,
   buildingId,
+  kind = "registry",
   documents,
 }: {
   title: string;
   projectId: string;
   landId: string;
   buildingId?: string;
+  kind?: DocumentKind;
   documents: RegistryDocument[] | undefined;
 }) {
   const router = useRouter();
@@ -39,7 +42,7 @@ export function DocumentsCard({
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const replaceTargetId = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const docs = documents ?? [];
+  const docs = (documents ?? []).filter((d) => d.kind === kind);
   const basePath = documentsPath(projectId, landId, buildingId);
 
   async function run(action: () => Promise<unknown>, successMessage: string) {
@@ -82,7 +85,7 @@ export function DocumentsCard({
           const file = takeFile(e.currentTarget);
           if (!file) return;
           void run(
-            () => uploadDocument(projectId, landId, file, buildingId),
+            () => uploadDocument(projectId, landId, file, buildingId, kind),
             "ファイルを添付しました",
           );
         }}

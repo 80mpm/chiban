@@ -36,12 +36,17 @@ export interface Mortgage {
   holder: string;
 }
 
+/** 添付ファイルの種別（registry = 登記簿・kouzu = 公図）。 */
+export type DocumentKind = "registry" | "kouzu";
+
 /**
  * 登記簿等の添付ファイル（メタデータのみ）。
  * ファイル本体は API のダウンロードエンドポイントから取得する。
  */
 export interface RegistryDocument {
   id: string;
+  /** 種別。土地は登記簿のみ、建物は登記簿・公図の両方を持ちうる。 */
+  kind: DocumentKind;
   /** 元のファイル名（表示・ダウンロード名）。 */
   fileName: string;
   /** MIME タイプ（application/pdf・image/jpeg・image/png）。 */
