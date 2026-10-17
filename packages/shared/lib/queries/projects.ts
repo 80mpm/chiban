@@ -36,27 +36,20 @@ export const LAND_SELECT = `
       JOIN chibankuiki c ON c.id = p.chibankuiki_id
 `;
 
-/** 全案件を lands・visits 込みのツリーで返す（3 クエリで組み立て）。 */
-export async function getProjectsTree(): Promise<Project[]> {
-  await ensureDbReady();
-
-  const projRows = await sql<ProjectRow[]>`SELECT * FROM projects ORDER BY id`;
-  const landRows = await sql.unsafe<LandRow[]>(
-    LAND_SELECT + " ORDER BY l.project_id, l.created_at, l.id",
-  );
-  const visitRows = await sql<VisitRow[]>`
-    SELECT * FROM visits ORDER BY land_id, date, id
-  `;
-
+/** 土地 1 件ぶんの子データ（訪問記録・建物・登記簿）を landJson に渡す形で束ねる。 */
+function buildLands(
+  landRows: LandRow[],
+  visitRows: (VisitRow & { land_id: string })[],
+  buildingsByLand: Map<string, Building[]>,
+  documentsByLand: Map<string, RegistryDocument[]>,
+): Map<number, Land[]> {
   const visitsByLand = new Map<string, Visit[]>();
   for (const v of visitRows) {
-    const landId = (v as VisitRow & { land_id: string }).land_id;
-    if (!visitsByLand.has(landId)) visitsByLand.set(landId, []);
-    visitsByLand.get(landId)!.push(visitJson(v));
+    if (!visitsByLand.has(v.land_id)) visitsByLand.set(v.land_id, []);
+    visitsByLand.get(v.land_id)!.push(visitJson(v));
   }
 
-  const buildingsByLand = await fetchBuildingsByLand(sql);
-  const documentsByLand = await fetchDocumentsByLand(sql);
+  const emptyVisits: Visit[] = [];
   const emptyBuildings: Building[] = [];
   const emptyDocuments: RegistryDocument[] = [];
 
@@ -68,14 +61,77 @@ export async function getProjectsTree(): Promise<Project[]> {
       .push(
         landJson(
           l,
-          visitsByLand.get(l.id) ?? [],
+          visitsByLand.get(l.id) ?? emptyVisits,
           buildingsByLand.get(l.id) ?? emptyBuildings,
           documentsByLand.get(l.id) ?? emptyDocuments,
         ),
       );
   }
+  return landsByProj;
+}
 
+/**
+ * 全案件を lands・visits 込みのツリーで返す。
+ *
+ * 5 本のクエリは互いに独立なので Promise.all で並行実行する（建物の登記簿だけは
+ * 建物 id に依存するため fetchBuildingsByLand の内側で直列になる）。マネージド DB が
+ * 関数と別リージョンにある構成では 1 往復が 100ms 超になるため、直列に積むと
+ * そのまま応答時間になる。
+ */
+export async function getProjectsTree(): Promise<Project[]> {
+  await ensureDbReady();
+
+  const [projRows, landRows, visitRows, buildingsByLand, documentsByLand] =
+    await Promise.all([
+      sql<ProjectRow[]>`SELECT * FROM projects ORDER BY id`,
+      sql.unsafe<LandRow[]>(LAND_SELECT + " ORDER BY l.project_id, l.created_at, l.id"),
+      sql<(VisitRow & { land_id: string })[]>`
+        SELECT * FROM visits ORDER BY land_id, date, id
+      `,
+      fetchBuildingsByLand(sql),
+      fetchDocumentsByLand(sql),
+    ]);
+
+  const landsByProj = buildLands(landRows, visitRows, buildingsByLand, documentsByLand);
   return projRows.map((p) => projectJson(p, landsByProj.get(p.id) ?? []));
+}
+
+/**
+ * 案件 1 件だけを lands・visits 込みのツリーで返す（無ければ null）。
+ *
+ * 案件詳細ページが getProjectsTree() で全案件を読んでから 1 件に絞っていたため、
+ * 表示に使わない案件の土地・訪問記録・建物・登記簿まで毎回読んでいた。
+ * ここでは案件 id で絞り込んでから子データを引く。
+ */
+export async function getProjectTree(projectId: string | number): Promise<Project | null> {
+  await ensureDbReady();
+  // ページから呼ばれるため、id が数値でないときも例外ではなく「無し」を返す
+  // （呼び出し側が notFound() を出す。parseProjectId は 404 を throw するので使わない）
+  const id = Number(projectId);
+  if (!Number.isInteger(id)) return null;
+
+  const [projRows, landRows] = await Promise.all([
+    sql<ProjectRow[]>`SELECT * FROM projects WHERE id = ${id}`,
+    sql.unsafe<LandRow[]>(
+      LAND_SELECT + " WHERE l.project_id = $1 ORDER BY l.created_at, l.id",
+      [id] as never[],
+    ),
+  ]);
+  if (projRows.length === 0) return null;
+
+  const landIds = landRows.map((l) => l.id);
+  if (landIds.length === 0) return projectJson(projRows[0], []);
+
+  const [visitRows, buildingsByLand, documentsByLand] = await Promise.all([
+    sql<(VisitRow & { land_id: string })[]>`
+      SELECT * FROM visits WHERE land_id = ANY(${landIds}) ORDER BY land_id, date, id
+    `,
+    fetchBuildingsByLand(sql, landIds),
+    fetchDocumentsByLand(sql, landIds),
+  ]);
+
+  const landsByProj = buildLands(landRows, visitRows, buildingsByLand, documentsByLand);
+  return projectJson(projRows[0], landsByProj.get(projRows[0].id) ?? []);
 }
 
 // ============================================================

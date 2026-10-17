@@ -15,6 +15,9 @@ export default async function ProjectDetailPage({
 }) {
   const { id } = await params;
   const user = await requireAppUser(`/projects/${id}`);
+  // ProjectDetailClient は TanStack Query の ["projects"] キャッシュ（案件一覧と共有）を
+  // initialData で温めるため、ここは 1 件だけでなく全案件を渡す必要がある。
+  // 1 件だけ渡すと案件一覧へ遷移したときに一瞬 1 件しか出ない。
   const projects = await getProjectsTree();
   const proj = projects.find((p) => p.id === id);
 

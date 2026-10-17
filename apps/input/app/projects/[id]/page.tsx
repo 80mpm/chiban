@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Topbar } from "@chiban/shared/components/Topbar";
 import { ProjectDetailView } from "@/components/project/ProjectDetailView";
-import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
+import { getProjectTree } from "@chiban/shared/lib/queries/projects";
 import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +14,7 @@ export default async function ProjectDetailPage({
 }) {
   const { id } = await params;
   const user = await requireAppUser(`/projects/${id}`);
-  const projects = await getProjectsTree();
-  const proj = projects.find((p) => p.id === id);
+  const proj = await getProjectTree(id);
   if (!proj) notFound();
   return (
     <div className="grid h-screen grid-rows-[56px_1fr]">

@@ -532,6 +532,14 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 
 ## 技術的な注意点
 
+- **案件の読み出しは「1 件なら 1 件だけ」「独立クエリは並行」**（`lib/queries/projects.ts`）。
+  案件 1 件を表示するページは `getProjectTree(id)`、案件一覧と `GET /api/projects` だけが
+  `getProjectsTree()`（全件）を使う。どちらも互いに独立なクエリは `Promise.all` で並行実行する
+  （建物の登記簿だけは建物 id に依存するため内側で直列）。マネージド DB が関数と別リージョンに
+  ある構成では 1 往復が 100ms を超えるため、直列に積むとそのまま応答時間になる。
+  **閲覧システムの案件詳細だけは例外で全件取得のまま**: `ProjectDetailClient` が案件一覧と共有の
+  TanStack Query キャッシュ `["projects"]` を `initialData` で温めるため、1 件だけ渡すと
+  案件一覧へ遷移したときに一瞬 1 件しか表示されない
 - **データ取得**: 各 page.tsx（Server Component・`force-dynamic`）が `lib/queries` を直接呼んで
   初期データを取得し、クライアントへ渡す。書き込み後の反映はアプリで方式が異なる:
   - **input**: フォーム保存 → `lib/data-client` の素の fetch → 成功で詳細ページへ `router.push` +
@@ -580,3 +588,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
   図面が 1 枚しかないので配置の問題ではなく、登記所備付地図データ由来。未対応
 - 任意座標系の図面は町ごとに代表点へ寄せているため、**隣り合う町の図面どうしは重なりうる**。
   筆選択・公図風ビューは常に 1 つの町だけを描くので表示上の実害はない
+- **本番の Vercel 関数リージョンは hnd1（東京）**（両プロジェクトとも 2026-10 に設定）。
+  以前は既定の iad1（米国東部）で DB と別リージョンにあり、DB 往復 1 回あたり約 130ms・
+  トップページ TTFB 約 1 秒かかっていた（hnd1 移行後は約 0.1 秒）。**リージョンはビルド時に
+  デプロイへ焼き込まれる**ため、設定を変えたら再デプロイしないと反映されない

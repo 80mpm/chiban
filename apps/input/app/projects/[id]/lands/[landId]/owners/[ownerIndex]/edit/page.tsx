@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Topbar } from "@chiban/shared/components/Topbar";
 import { OwnerForm } from "@/components/owner/OwnerForm";
-import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
+import { getProjectTree } from "@chiban/shared/lib/queries/projects";
 import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +14,7 @@ export default async function LandOwnerEditPage({
 }) {
   const { id, landId, ownerIndex } = await params;
   const user = await requireAppUser(`/projects/${id}/lands/${landId}/owners/${ownerIndex}/edit`);
-  const projects = await getProjectsTree();
-  const proj = projects.find((p) => p.id === id);
+  const proj = await getProjectTree(id);
   const land = proj?.lands?.find((l) => l.id === landId);
   const n = Number(ownerIndex);
   if (!proj || !land || !Number.isInteger(n) || n < 1 || n > (land.owners ?? []).length) {

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Topbar } from "@chiban/shared/components/Topbar";
 import { BuildingDetailView } from "@/components/building/BuildingDetailView";
-import { getProjectsTree } from "@chiban/shared/lib/queries/projects";
+import { getProjectTree } from "@chiban/shared/lib/queries/projects";
 import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +14,7 @@ export default async function BuildingDetailPage({
 }) {
   const { id, landId, buildingId } = await params;
   const user = await requireAppUser(`/projects/${id}/lands/${landId}/buildings/${buildingId}`);
-  const projects = await getProjectsTree();
-  const proj = projects.find((p) => p.id === id);
+  const proj = await getProjectTree(id);
   const land = proj?.lands?.find((l) => l.id === landId);
   const building = land?.buildings?.find((b) => b.id === buildingId);
   if (!proj || !land || !building) notFound();
