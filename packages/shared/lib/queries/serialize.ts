@@ -14,6 +14,7 @@ import type {
   Owner,
   LatLng,
   RegistryDocument,
+  ResidentOwnerMatch,
 } from "../types";
 
 /**
@@ -75,6 +76,7 @@ export interface BuildingRow {
   floor_area: string | number | null;
   built_date: Date | string | null;
   description: string;
+  resident_owner_match: ResidentOwnerMatch;
   owners: Owner[];
   mortgages: MortgageRow[];
   created_at: Date | null;
@@ -106,6 +108,7 @@ export function buildingJson(
     floorArea: num(row.floor_area),
     builtDate: dateOnly(row.built_date),
     description: row.description,
+    residentOwnerMatch: row.resident_owner_match,
     owners: row.owners,
     mortgages: mortgagesJson(row.mortgages),
     createdAt: iso(row.created_at),

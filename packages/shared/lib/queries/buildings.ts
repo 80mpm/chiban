@@ -11,7 +11,8 @@ import { replaceOwnersInto, ownersSelect, dateOrNull } from "./owners";
 import { replaceMortgagesInto, mortgagesSelect } from "./mortgages";
 import { fetchDocumentsByBuilding } from "./documents";
 import { buildingJson, type BuildingRow } from "./serialize";
-import type { Building, Owner, RegistryDocument } from "../types";
+import type { Building, Owner, RegistryDocument, ResidentOwnerMatch } from "../types";
+import { RESIDENT_OWNER_MATCH_KEYS } from "../format";
 
 type SqlLike = Sql | TransactionSql;
 
@@ -91,21 +92,26 @@ export async function replaceBuildings(
     const usage = (b?.usage ?? "").trim();
     const builtDate = dateOrNull(b?.builtDate);
     const description = (b?.description ?? "").trim();
+    // 3 値以外（未送信を含む）は「未確認」に倒す（CHECK 制約違反で 500 にしない）
+    const residentOwnerMatch: ResidentOwnerMatch = RESIDENT_OWNER_MATCH_KEYS.find(
+      (k) => k === b?.residentOwnerMatch,
+    ) ?? "unknown";
 
     if (existingIds.has(bid)) {
       await sql`
         UPDATE buildings
            SET location = ${location}, kaoku_number = ${kaokuNumber},
                structure = ${structure}, usage = ${usage}, floor_area = ${floorArea},
-               built_date = ${builtDate}, description = ${description}, updated_at = now()
+               built_date = ${builtDate}, description = ${description},
+               resident_owner_match = ${residentOwnerMatch}, updated_at = now()
          WHERE id = ${bid} AND land_id = ${landId}
       `;
     } else {
       await sql`
         INSERT INTO buildings (id, land_id, location, kaoku_number, structure, usage, floor_area,
-                               built_date, description)
+                               built_date, description, resident_owner_match)
         VALUES (${bid}, ${landId}, ${location}, ${kaokuNumber}, ${structure}, ${usage},
-                ${floorArea}, ${builtDate}, ${description})
+                ${floorArea}, ${builtDate}, ${description}, ${residentOwnerMatch})
       `;
     }
     keptIds.push(bid);

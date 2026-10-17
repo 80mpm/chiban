@@ -114,6 +114,10 @@ CREATE INDEX IF NOT EXISTS idx_buildings_land ON buildings (land_id, created_at,
 -- 2026-07 追加列（既存 DB をデータを保持したまま追随させる。CREATE TABLE IF NOT EXISTS は
 -- 既存テーブルに列を足さないため、後から増えた列はここで冪等に ALTER する）
 ALTER TABLE buildings ADD COLUMN IF NOT EXISTS location text NOT NULL DEFAULT '';
+-- 2026-10 追加列: 居住者と所有者（建物の地権者）の一致（match=一致 / mismatch=不一致 /
+-- unknown=未確認）。既存の建物は DEFAULT により「未確認」になる
+ALTER TABLE buildings ADD COLUMN IF NOT EXISTS resident_owner_match text NOT NULL DEFAULT 'unknown'
+    CHECK (resident_owner_match IN ('match', 'mismatch', 'unknown'));
 
 CREATE TABLE IF NOT EXISTS building_owners (
     id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- 追加順（= owners 配列の並び）

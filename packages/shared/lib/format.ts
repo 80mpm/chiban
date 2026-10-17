@@ -3,7 +3,7 @@
 // クライアント・サーバ双方から使える純関数。
 // ============================================================
 
-import type { Owner, LandStatus, Building, Mortgage, UserRole } from "./types";
+import type { Owner, LandStatus, Building, Mortgage, UserRole, ResidentOwnerMatch } from "./types";
 
 /** ステータス定義（label / color）。 */
 export const STATUS_DEFS: Record<LandStatus, { label: string; color: string }> = {
@@ -12,6 +12,15 @@ export const STATUS_DEFS: Record<LandStatus, { label: string; color: string }> =
 };
 
 export const STATUS_KEYS: LandStatus[] = ["target", "acquired"];
+
+/** 居住者と所有者（建物の地権者）の一致の表示定義。 */
+export const RESIDENT_OWNER_MATCH_DEFS: Record<ResidentOwnerMatch, { label: string; color: string }> = {
+  match: { label: "一致", color: "#10b981" },
+  mismatch: { label: "不一致", color: "#f59e0b" },
+  unknown: { label: "未確認", color: "#94a3b8" },
+};
+
+export const RESIDENT_OWNER_MATCH_KEYS: ResidentOwnerMatch[] = ["match", "mismatch", "unknown"];
 
 /** ユーザー種別の表示定義（sales=閲覧システム利用 / office=入力システム利用）。 */
 export const USER_ROLE_DEFS: Record<UserRole, { label: string; system: string }> = {
