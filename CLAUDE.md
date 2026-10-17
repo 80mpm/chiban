@@ -190,6 +190,9 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
   直近にログインユーザーが取得した同一タイルはキャッシュヒットで返りうる（地図画像のみの
   低リスクとして許容）
 - ログイン失敗は ID の存在を漏らさない共通文言の 401。停止中・ロール外は 403
+- **デモ用アカウントは `id` / `pass`**（`lib/db/seed-users.ts`）。種別は事務のため
+  閲覧システム・入力システムのどちらにもこの 1 つでログインできる。既存 DB にも
+  `ON CONFLICT (login_id) DO NOTHING` で毎回用意するが、パスワードを変更していれば上書きしない
 - パスワードは `lib/auth/password.ts`（crypto.scrypt）。ログイン画面は shared の `LoginForm`
   （デモ用初期アカウントの案内付き）。Topbar にユーザー名・種別・ログアウトを表示
 
@@ -507,7 +510,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
 | `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK` で土地・建物のどちらか一方にだけ紐づくことを担保。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
-| `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。初期 3 名を冪等シード（初期パスワード `demo1234`）。**`POST /api/reset` では消えない** |
+| `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。デモアカウント **`id` / `pass`**（種別=事務なので閲覧・入力の両方に入れる）は既存 DB にも毎回冪等に用意する。氏名入りの初期アカウント（honda=営業・パスワード `demo1234`）は users が空のときだけ投入（kimura・sato は廃止）。**`POST /api/reset` では消えない** |
 | `sessions` | token (PK), user_id (FK・CASCADE), created_at | ログインセッション（無期限。失効はログアウトと停止のみ） |
 
 - 案件・土地の削除はカスケード。numeric（容積率・面積）は postgres.js では文字列で返るため `serialize.ts` で数値化する

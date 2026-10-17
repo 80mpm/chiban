@@ -110,7 +110,7 @@ export function LoginForm({ appName }: { appName: string }) {
         </form>
 
         <p className="mt-3 text-center text-[11px] text-muted-foreground">
-          デモ用初期アカウント: kimura（営業）/ sato（事務）・パスワードは demo1234
+          デモ用アカウント: id / pass（閲覧・入力とも可）
         </p>
       </div>
     </div>
