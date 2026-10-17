@@ -10,7 +10,7 @@
 import { sql } from "./client";
 import { SCHEMA_SQL } from "./schema";
 import { seedAddressMasterIfEmpty } from "./seed-address";
-import { seedParcelsIfEmpty } from "./seed-parcels";
+import { refreshParcelGeometryIfStale, seedParcelsIfEmpty } from "./seed-parcels";
 import { seedUsersIfEmpty } from "./seed-users";
 import { insertSamples } from "./sample";
 
@@ -72,7 +72,10 @@ async function initDb(): Promise<void> {
   // 複数ステートメントのためシンプルプロトコルで実行する
   await sql.unsafe(SCHEMA_SQL).simple();
   await seedAddressMasterIfEmpty(sql);
-  await seedParcelsIfEmpty(sql);
+  if (!(await seedParcelsIfEmpty(sql))) {
+    // 既存 DB: 筆ポリゴンの配置アルゴリズムが変わっていれば geometry だけ更新する
+    await refreshParcelGeometryIfStale(sql);
+  }
   await seedUsersIfEmpty(sql);
 
   const seeded = await sql`SELECT 1 FROM app_meta WHERE key = 'seeded'`;
