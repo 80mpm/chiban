@@ -10,7 +10,10 @@ services:
       POSTGRES_PASSWORD: chiban
       POSTGRES_DB: chiban
     ports:
-      - "5432:5432"
+      # ホスト側ポートは CHIBAN_DB_PORT で変えられる（既定 5432）。
+      # 他プロジェクトの PostgreSQL が 5432 を使っている場合はリポジトリ直下の
+      # .env に CHIBAN_DB_PORT=5433 などを書き、DATABASE_URL も合わせる。
+      - "${CHIBAN_DB_PORT:-5432}:5432"
     volumes:
       - chiban-pgdata:/var/lib/postgresql/data
     healthcheck:
