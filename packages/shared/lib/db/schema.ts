@@ -166,6 +166,10 @@ CREATE INDEX IF NOT EXISTS idx_registry_documents_land
     ON registry_documents (land_id, created_at, id);
 CREATE INDEX IF NOT EXISTS idx_registry_documents_building
     ON registry_documents (building_id, created_at, id);
+-- 2026-10 追加列: 添付の種別（'registry' = 登記簿・'kouzu' = 公図）。既存行は登記簿扱い。
+-- 公図は建物詳細の「公図」カードから添付する（Issue #42）
+ALTER TABLE registry_documents ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'registry'
+    CHECK (kind IN ('registry', 'kouzu'));
 
 CREATE TABLE IF NOT EXISTS visits (
     id            text PRIMARY KEY,

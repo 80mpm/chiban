@@ -90,7 +90,7 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 | `/projects/[id]/lands/[landId]/owners/new`・`owners/[n]/edit` | 土地の地権者を 1 人ずつ追加・編集・削除（`[n]` は並び順 1 始まり。行に ID が無いため） |
 | `/projects/[id]/lands/[landId]/mortgages/new`・`mortgages/[n]/edit` | 土地の抵当権を 1 件ずつ追加・編集・削除 |
 | `/projects/[id]/lands/[landId]/buildings/new` | 建物追加フォーム（基本情報のみ。作成後は新建物の詳細へ） |
-| `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の地権者・抵当権・**登記簿**カード + 削除） |
+| `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の地権者・抵当権・**登記簿**・**公図**カード + 削除） |
 | `/projects/[id]/lands/[landId]/buildings/[buildingId]/edit` | 建物の基本情報の編集フォーム |
 | `.../buildings/[buildingId]/owners/...`・`mortgages/...` | 建物の地権者・抵当権の行単位ページ（土地側と同型） |
 | `/users` | ユーザー管理（一覧。種別フィルタタブ「すべて/営業/事務」= Issue #22/#23。案件一覧ヘッダから遷移） |
@@ -233,8 +233,8 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
 | `DELETE /api/projects/:id/lands/:landId` | 土地削除 |
 | `POST /api/projects/:id/lands/:landId/documents` | 土地の登記簿を添付（multipart/form-data・PDF/JPEG/PNG・10MB まで） |
 | `GET・PUT・DELETE /api/projects/:id/lands/:landId/documents/:docId` | 土地の登記簿のダウンロード（inline・no-store）・差し替え・削除 |
-| `POST /api/projects/:id/lands/:landId/buildings/:buildingId/documents` | 建物の登記簿を添付 |
-| `GET・PUT・DELETE /api/.../buildings/:buildingId/documents/:docId` | 建物の登記簿のダウンロード・差し替え・削除 |
+| `POST /api/projects/:id/lands/:landId/buildings/:buildingId/documents` | 建物の登記簿を添付。`?kind=kouzu` で公図として添付（不正な kind は 400） |
+| `GET・PUT・DELETE /api/.../buildings/:buildingId/documents/:docId` | 建物の登記簿・公図のダウンロード・差し替え・削除（種別は添付時のまま） |
 | `GET /api/users` | 全ユーザー（password_hash は決して返さない） |
 | `POST /api/users` | ユーザー登録 {loginId, name, role, password}（loginId 重複 409） |
 | `PATCH /api/users/:userId` | ユーザーの部分更新 {loginId?, name?, role?, isActive?, password?}（loginId 変更可・重複 409。password でパスワード再設定。削除 API は無し・停止 = isActive:false） |
@@ -318,7 +318,7 @@ apps/input/                   # 案件入力システム（事務用・port 3001
     map/{PolygonDrawMap,AreaMapEditClient}.tsx   # Leaflet.draw 描画 / 領域マップ編集ページ本体
     parcel/ParcelPickerClient.tsx                # 筆選択ページ本体（追加/変更共用）
     land/{LandDetailView,LandForm}.tsx           # LandDetailView は OwnersList/MortgagesList も export
-    document/DocumentsCard.tsx                   # 登記簿等の添付カード（土地・建物共用。追加/差し替え/削除）
+    document/DocumentsCard.tsx                   # 登記簿等の添付カード（土地・建物共用。kind で登記簿/公図を切替。追加/差し替え/削除）
     Card.tsx                                     # カード外枠 + EditLink/SmallButton（土地・建物・登記簿で共用）
     owner/OwnerForm.tsx                          # 地権者 1 人のフォーム（土地/建物共用・削除もここ）
     mortgage/MortgageForm.tsx                    # 抵当権 1 件のフォーム（土地/建物共用・削除もここ）
@@ -484,7 +484,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
   └ Land { id, parcelId, aza, chiban, owners[{name, share, address, regDate, regCause, description}],
            description, areaM2, areaTsubo, mortgages[{date, amount, holder}], status,
            createdAt, updatedAt, polygon[[lat,lng]], visits[], buildings[],
-           documents[{id, fileName, contentType, byteSize, uploadedBy, createdAt, updatedAt}] }
+           documents[{id, kind, fileName, contentType, byteSize, uploadedBy, createdAt, updatedAt}] }
       └ Visit { id, user, comment, date, directOrTel, meetingType, nextDate, progress, principal }
 ```
 
@@ -508,7 +508,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `projects` | id (IDENTITY), name, description, polygon (jsonb), address, access, current_far, target_far, front_roads (jsonb), created_at, updated_at | 案件。API では id を文字列で返す |
 | `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_m2, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)`。地権者は `land_owners`、抵当権は `land_mortgages` に正規化 |
 | `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
-| `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK` で土地・建物のどちらか一方にだけ紐づくことを担保。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
+| `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), kind ('registry'/'kouzu'), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK` で土地・建物のどちらか一方にだけ紐づくことを担保。`kind` は種別（既定 `'registry'` = 登記簿・`'kouzu'` = 公図。2026-10 に `ADD COLUMN IF NOT EXISTS` で追加し既存行は登記簿扱い）。公図は建物にのみ添付でき、土地の読み出しは登記簿だけを返す。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
 | `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。デモアカウント **`id` / `pass`**（種別=事務なので閲覧・入力の両方に入れる）は既存 DB にも毎回冪等に用意する。氏名入りの初期アカウント（honda=営業・パスワード `demo1234`）は users が空のときだけ投入（kimura・sato は廃止）。**`POST /api/reset` では消えない** |
 | `sessions` | token (PK), user_id (FK・CASCADE), created_at | ログインセッション（無期限。失効はログアウトと停止のみ） |
@@ -530,6 +530,8 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
   ユーザー管理（登録・停止/再開・パスワード再設定。入力システムの `/users`）
 - できること（続き）: 土地・建物への登記簿等の添付（PDF/JPEG/PNG・10MB まで。追加・ダウンロード・
   差し替え・削除。入力システムのみ。閲覧システムには添付の API・UI を持たない）
+- できること（続き）: 建物への公図ファイルの添付（建物詳細の「公図」カード。登記簿とは別カードで、
+  対応形式・操作は登記簿と同じ。Issue #42）
 - できること（続き）: ログイン/ログアウト（両システム。全ページ・全 API を保護）
 - できないこと: 訪問記録の編集・削除（履歴のため不可）、ユーザーの削除（停止のみ）
 

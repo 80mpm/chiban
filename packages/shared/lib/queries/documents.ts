@@ -13,7 +13,7 @@ import { ApiError } from "../api-error";
 import { parseProjectId } from "./helpers";
 import { iso } from "./serialize";
 import type { UploadedFile } from "../request";
-import type { RegistryDocument } from "../types";
+import type { DocumentKind, RegistryDocument } from "../types";
 
 type SqlLike = Sql | TransactionSql;
 
@@ -27,6 +27,18 @@ export const ALLOWED_DOCUMENT_TYPES = [
   "image/png",
 ] as const;
 
+/** 受け付ける種別。公図（kouzu）は建物にのみ添付できる。 */
+const DOCUMENT_KINDS: readonly DocumentKind[] = ["registry", "kouzu"];
+
+/** クエリ文字列等で受け取った種別を検証する（未指定は登記簿）。 */
+export function parseDocumentKind(value: string | null | undefined): DocumentKind {
+  if (!value) return "registry";
+  if (!(DOCUMENT_KINDS as readonly string[]).includes(value)) {
+    throw new ApiError(400, "添付の種別が不正です");
+  }
+  return value as DocumentKind;
+}
+
 /** 添付先（土地、または土地上の建物）。 */
 export interface DocumentScope {
   projectId: string;
@@ -36,10 +48,11 @@ export interface DocumentScope {
 }
 
 /** メタデータのみの列並び（data を含めない）。 */
-const META_COLUMNS = `id, file_name, content_type, byte_size, uploaded_by, created_at, updated_at`;
+const META_COLUMNS = `id, kind, file_name, content_type, byte_size, uploaded_by, created_at, updated_at`;
 
 interface DocumentRow {
   id: string;
+  kind: DocumentKind;
   file_name: string;
   content_type: string;
   byte_size: number;
@@ -51,6 +64,7 @@ interface DocumentRow {
 function documentJson(row: DocumentRow): RegistryDocument {
   return {
     id: row.id,
+    kind: row.kind,
     fileName: row.file_name,
     contentType: row.content_type,
     byteSize: Number(row.byte_size),
@@ -62,7 +76,7 @@ function documentJson(row: DocumentRow): RegistryDocument {
 
 // ----- 読み出し（ツリー組み立て用） -----
 
-/** 添付ファイルを land_id ごとにまとめて返す（土地の登記簿のみ）。 */
+/** 添付ファイルを land_id ごとにまとめて返す（土地の登記簿のみ。公図は土地に付かない）。 */
 export async function fetchDocumentsByLand(
   db: SqlLike,
   landIds?: string[],
@@ -70,12 +84,12 @@ export async function fetchDocumentsByLand(
   const rows = landIds
     ? await db.unsafe<(DocumentRow & { land_id: string })[]>(
         `SELECT land_id, ${META_COLUMNS} FROM registry_documents
-          WHERE land_id = ANY($1) ORDER BY land_id, created_at, id`,
+          WHERE land_id = ANY($1) AND kind = 'registry' ORDER BY land_id, created_at, id`,
         [landIds] as never[],
       )
     : await db.unsafe<(DocumentRow & { land_id: string })[]>(
         `SELECT land_id, ${META_COLUMNS} FROM registry_documents
-          WHERE land_id IS NOT NULL ORDER BY land_id, created_at, id`,
+          WHERE land_id IS NOT NULL AND kind = 'registry' ORDER BY land_id, created_at, id`,
       );
   const byLand = new Map<string, RegistryDocument[]>();
   for (const row of rows) {
@@ -85,7 +99,7 @@ export async function fetchDocumentsByLand(
   return byLand;
 }
 
-/** 添付ファイルを building_id ごとにまとめて返す（建物の登記簿のみ）。 */
+/** 添付ファイルを building_id ごとにまとめて返す（登記簿・公図の両方。画面側で kind ごとに分ける）。 */
 export async function fetchDocumentsByBuilding(
   db: SqlLike,
   buildingIds?: string[],
@@ -151,22 +165,26 @@ async function assertScope(db: SqlLike, scope: DocumentScope): Promise<void> {
 
 // ----- 書き込み -----
 
-/** 添付ファイルを追加する。 */
+/** 添付ファイルを追加する（kind 既定は登記簿。公図は建物にのみ添付できる）。 */
 export async function addDocument(
   scope: DocumentScope,
   file: UploadedFile,
   uploadedBy: string,
+  kind: DocumentKind = "registry",
 ): Promise<RegistryDocument> {
   await ensureDbReady();
   assertUploadable(file);
+  if (kind === "kouzu" && !scope.buildingId) {
+    throw new ApiError(400, "公図は建物にのみ添付できます");
+  }
 
   return sql.begin(async (tx) => {
     await assertScope(tx, scope);
     const id = uuid();
     const [row] = await tx.unsafe<DocumentRow[]>(
       `INSERT INTO registry_documents
-         (id, land_id, building_id, file_name, content_type, byte_size, data, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (id, land_id, building_id, file_name, content_type, byte_size, data, uploaded_by, kind)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING ${META_COLUMNS}`,
       [
         id,
@@ -177,6 +195,7 @@ export async function addDocument(
         file.bytes.length,
         file.bytes,
         uploadedBy,
+        kind,
       ] as never[],
     );
     return documentJson(row);

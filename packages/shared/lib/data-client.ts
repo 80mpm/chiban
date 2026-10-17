@@ -19,6 +19,7 @@ import type {
   User,
   UserRole,
   RegistryDocument,
+  DocumentKind,
 } from "./types";
 
 async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -171,7 +172,14 @@ export const uploadDocument = (
   landId: string,
   file: File,
   buildingId?: string,
-) => upload<RegistryDocument>("POST", documentsPath(projectId, landId, buildingId), file);
+  kind: DocumentKind = "registry",
+) =>
+  upload<RegistryDocument>(
+    "POST",
+    // 公図は建物にのみ添付でき、種別をクエリで渡す（既定の登記簿は付けない）
+    documentsPath(projectId, landId, buildingId) + (kind === "registry" ? "" : `?kind=${kind}`),
+    file,
+  );
 
 export const replaceDocument = (
   projectId: string,
