@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
+import { Card, EditLink } from "@/components/Card";
+import { DocumentsCard } from "@/components/document/DocumentsCard";
 import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { deleteLand } from "@chiban/shared/lib/data-client";
 import {
@@ -17,37 +18,6 @@ import type { Project, Land, Owner, Mortgage } from "@chiban/shared/lib/types";
 
 const dash = (s: string | null | undefined) => (s ? s : "—");
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
-
-function Card({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[color:var(--app-text-dark)]">{title}</h3>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function EditLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-md border border-border bg-white px-2.5 py-1 text-xs hover:bg-secondary"
-    >
-      {label}
-    </Link>
-  );
-}
 
 /**
  * 地権者の一覧（土地・建物共通）。editHrefFor を渡すと行ごとに
@@ -169,6 +139,13 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
       >
         <MortgagesList mortgages={land.mortgages} editHrefFor={(n) => `${base}/mortgages/${n}/edit`} />
       </Card>
+
+      <DocumentsCard
+        title="登記簿（土地）"
+        projectId={proj.id}
+        landId={land.id}
+        documents={land.documents}
+      />
 
       <Card
         title={`建物（${buildings.length}）`}

@@ -84,13 +84,13 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 | `/projects/[id]/edit` | 案件情報の編集フォーム（polygon/frontRoads は送らない） |
 | `/projects/[id]/map` | 領域・前面道路の編集（ポリゴン描画 + 前面道路幅員を**ローカル state に溜め「保存」で一括 PATCH**。描画中は保存不可） |
 | `/projects/[id]/lands/new` | 土地追加＝筆選択（町名プルダウン + 公図ビュー。クリック=選択 → ボタンで確定。成功後は新しい土地詳細へ） |
-| `/projects/[id]/lands/[landId]` | 土地詳細（基本情報・地権者・抵当権・建物のカード + 各行の編集導線・削除） |
+| `/projects/[id]/lands/[landId]` | 土地詳細（基本情報・地権者・抵当権・**登記簿**・建物のカード + 各行の編集導線・削除） |
 | `/projects/[id]/lands/[landId]/edit` | 土地編集フォーム（**基本情報のみ**: ステータス/面積/概要。owners/mortgages/buildings キーは送らない） |
 | `/projects/[id]/lands/[landId]/parcel` | 筆の変更（筆選択ページの change モード） |
 | `/projects/[id]/lands/[landId]/owners/new`・`owners/[n]/edit` | 土地の地権者を 1 人ずつ追加・編集・削除（`[n]` は並び順 1 始まり。行に ID が無いため） |
 | `/projects/[id]/lands/[landId]/mortgages/new`・`mortgages/[n]/edit` | 土地の抵当権を 1 件ずつ追加・編集・削除 |
 | `/projects/[id]/lands/[landId]/buildings/new` | 建物追加フォーム（基本情報のみ。作成後は新建物の詳細へ） |
-| `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の地権者・抵当権カード + 削除） |
+| `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の地権者・抵当権・**登記簿**カード + 削除） |
 | `/projects/[id]/lands/[landId]/buildings/[buildingId]/edit` | 建物の基本情報の編集フォーム |
 | `.../buildings/[buildingId]/owners/...`・`mortgages/...` | 建物の地権者・抵当権の行単位ページ（土地側と同型） |
 | `/users` | ユーザー管理（一覧。種別フィルタタブ「すべて/営業/事務」= Issue #22/#23。案件一覧ヘッダから遷移） |
@@ -228,6 +228,10 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
 | `POST /api/projects/:id/lands` | 土地追加（parcelId 必須。マスタ外 400・案件内重複 409） |
 | `PATCH /api/projects/:id/lands/:landId` | 土地の部分更新（parcelId 変更で町名・地番・領域・面積㎡を再導出） |
 | `DELETE /api/projects/:id/lands/:landId` | 土地削除 |
+| `POST /api/projects/:id/lands/:landId/documents` | 土地の登記簿を添付（multipart/form-data・PDF/JPEG/PNG・10MB まで） |
+| `GET・PUT・DELETE /api/projects/:id/lands/:landId/documents/:docId` | 土地の登記簿のダウンロード（inline・no-store）・差し替え・削除 |
+| `POST /api/projects/:id/lands/:landId/buildings/:buildingId/documents` | 建物の登記簿を添付 |
+| `GET・PUT・DELETE /api/.../buildings/:buildingId/documents/:docId` | 建物の登記簿のダウンロード・差し替え・削除 |
 | `GET /api/users` | 全ユーザー（password_hash は決して返さない） |
 | `POST /api/users` | ユーザー登録 {loginId, name, role, password}（loginId 重複 409） |
 | `PATCH /api/users/:userId` | ユーザーの部分更新 {loginId?, name?, role?, isActive?, password?}（loginId 変更可・重複 409。password でパスワード再設定。削除 API は無し・停止 = isActive:false） |
@@ -251,7 +255,8 @@ packages/shared/              # @chiban/shared — ビルドしない TS ソー�
   lib/
     db/{client,schema,init,seed-address,seed-parcels,sample,ids,data-files}.ts  # PostgreSQL データレイヤー
                               # data-files.ts = シードファイルの cwd 上方探索リゾルバ（seedDataPath）
-    queries/{projects,lands,visits,parcels,owners,buildings,mortgages,serialize,helpers}.ts  # 読み書き + 導出ロジック
+    queries/{projects,lands,visits,parcels,owners,buildings,mortgages,documents,serialize,helpers}.ts  # 読み書き + 導出ロジック
+                              # documents.ts = 登記簿等の添付ファイル（registry_documents）の CRUD
     geo.ts                    # parcelRing / polygonAreaM2 / m2ToTsubo / convexHull
     api-error.ts / request.ts # withApi・ApiError / JSON ボディ読み取り
     zenrin.ts                 # ログイン認証セッション（DB 共有）+ タイル取得
@@ -299,8 +304,10 @@ apps/input/                   # 案件入力システム（事務用・port 3001
     projects/[id]/lands/[landId]/buildings/[buildingId]/edit/page.tsx  # 建物の基本情報編集
     projects/[id]/lands/[landId]/buildings/[buildingId]/{owners,mortgages}/...  # 建物の地権者・抵当権（行単位）
     api/                      # projects(GET+POST) / projects/[id](PATCH/DELETE) / lands CRUD /
-                              # parcel-towns / parcels / reset / youto-wms
+                              # parcel-towns / parcels / reset / youto-wms /
+                              # lands/[landId]/documents(+[docId]) と buildings/[buildingId]/documents(+[docId])
     tile/[z]/[x]/[y]/route.ts # ZENRIN タイル中継
+  lib/{auth,documents}.ts     # 認可設定（事務のみ） / 添付ファイル API の共通処理（GET/PUT/DELETE）
   components/
     PageHeader.tsx / ConfirmDeleteButton.tsx     # パンくず+タイトル / confirm付き削除ボタン
     form/{use-form-submit.ts,FormActions.tsx}    # 保存フロー共通（トースト+遷移 / エラーバナー+保存/キャンセル）
@@ -308,6 +315,8 @@ apps/input/                   # 案件入力システム（事務用・port 3001
     map/{PolygonDrawMap,AreaMapEditClient}.tsx   # Leaflet.draw 描画 / 領域マップ編集ページ本体
     parcel/ParcelPickerClient.tsx                # 筆選択ページ本体（追加/変更共用）
     land/{LandDetailView,LandForm}.tsx           # LandDetailView は OwnersList/MortgagesList も export
+    document/DocumentsCard.tsx                   # 登記簿等の添付カード（土地・建物共用。追加/差し替え/削除）
+    Card.tsx                                     # カード外枠 + EditLink/SmallButton（土地・建物・登記簿で共用）
     owner/OwnerForm.tsx                          # 地権者 1 人のフォーム（土地/建物共用・削除もここ）
     mortgage/MortgageForm.tsx                    # 抵当権 1 件のフォーム（土地/建物共用・削除もここ）
     project/FrontRoadEditor.tsx                  # 前面道路幅員の一覧編集（ローカル onChange）
@@ -471,7 +480,8 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
           address, access, currentFar, targetFar, frontRoads[{edgeIndex, width}], lands[] }
   └ Land { id, parcelId, aza, chiban, owners[{name, share, address, regDate, regCause, description}],
            description, areaM2, areaTsubo, mortgages[{date, amount, holder}], status,
-           createdAt, updatedAt, polygon[[lat,lng]], visits[] }
+           createdAt, updatedAt, polygon[[lat,lng]], visits[], buildings[],
+           documents[{id, fileName, contentType, byteSize, uploadedBy, createdAt, updatedAt}] }
       └ Visit { id, user, comment, date, directOrTel, meetingType, nextDate, progress, principal }
 ```
 
@@ -495,6 +505,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `projects` | id (IDENTITY), name, description, polygon (jsonb), address, access, current_far, target_far, front_roads (jsonb), created_at, updated_at | 案件。API では id を文字列で返す |
 | `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_m2, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)`。地権者は `land_owners`、抵当権は `land_mortgages` に正規化 |
 | `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
+| `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK` で土地・建物のどちらか一方にだけ紐づくことを担保。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
 | `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。初期 3 名を冪等シード（初期パスワード `demo1234`）。**`POST /api/reset` では消えない** |
 | `sessions` | token (PK), user_id (FK・CASCADE), created_at | ログインセッション（無期限。失効はログアウトと停止のみ） |
@@ -514,6 +525,8 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 
 - できること: 案件・土地のCRUD、ステータス変更、訪問記録追加（閲覧システム）、サンプルデータへのリセット、
   ユーザー管理（登録・停止/再開・パスワード再設定。入力システムの `/users`）
+- できること（続き）: 土地・建物への登記簿等の添付（PDF/JPEG/PNG・10MB まで。追加・ダウンロード・
+  差し替え・削除。入力システムのみ。閲覧システムには添付の API・UI を持たない）
 - できること（続き）: ログイン/ログアウト（両システム。全ページ・全 API を保護）
 - できないこと: 訪問記録の編集・削除（履歴のため不可）、ユーザーの削除（停止のみ）
 
@@ -538,6 +551,13 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
   ホットリロードで多重接続/多重初期化しないように。同時ログイン数=1 の ZENRIN セッションも 1 本に
   集約される）。Shift-JIS CSV は `iconv-lite` で復号、筆マスタ COPY は
   `pg` + `pg-copy-streams`（その他は `postgres`/postgres.js）
+- **建物の保存は UPSERT**（`queries/buildings.ts` の `replaceBuildings`）。土地の PATCH に
+  `buildings` を畳み込む全置換方式は維持しつつ、送信された既存 id は UPDATE で残し、配列に無い建物だけを
+  削除する。かつての DELETE + INSERT では ①建物に紐づく登記簿（`registry_documents`）が
+  ON DELETE CASCADE で消え、②`created_at` が編集のたびに現在時刻へ戻っていた
+- **添付ファイルのダウンロードは `Cache-Control: no-store`**。登記簿は非公開情報のため、
+  タイル中継のように CDN へキャッシュさせてはいけない。表示は `Content-Disposition: inline`
+  （日本語ファイル名は RFC 5987 の `filename*` で付ける）
 - **jsonb の書き込みは安全テンプレートの `sql.json`** を使う（`sql.unsafe(...$::jsonb)` は値を
   二重エンコードし、RETURNING で文字列のまま返るため使わない）
 
@@ -554,7 +574,8 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 
 - オフライン未対応（ZENRIN タイル取得・PostgreSQL の起動が必須）
 - 住所検索は Nominatim のジオコーディング結果に依存（レート制限 1 req/sec）。案件名・地番検索は未対応
-- 写真添付機能なし
+- 写真添付機能なし（登記簿等のファイル添付は土地・建物に対応済み。写真専用の扱いは未対応）
+- 登記簿の添付は入力システム専用。閲覧システム（営業）からはファイル本体を取得できない
 - 池之端４丁目（図面 13106-0105-107）は原データの時点で筆どうしが重なっている（面積比で約35%）。
   図面が 1 枚しかないので配置の問題ではなく、登記所備付地図データ由来。未対応
 - 任意座標系の図面は町ごとに代表点へ寄せているため、**隣り合う町の図面どうしは重なりうる**。

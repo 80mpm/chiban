@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
+import { Card, EditLink } from "@/components/Card";
+import { DocumentsCard } from "@/components/document/DocumentsCard";
 import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { OwnersList, MortgagesList } from "@/components/land/LandDetailView";
 import { updateLand } from "@chiban/shared/lib/data-client";
@@ -10,37 +11,6 @@ import type { Project, Land, Building } from "@chiban/shared/lib/types";
 
 const dash = (s: string | null | undefined) => (s ? s : "—");
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
-
-function Card({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[color:var(--app-text-dark)]">{title}</h3>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function EditLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-md border border-border bg-white px-2.5 py-1 text-xs hover:bg-secondary"
-    >
-      {label}
-    </Link>
-  );
-}
 
 /** 建物詳細（読み取り専用ハブ）。基本情報・建物の地権者・抵当権の各編集ページへの導線を持つ。 */
 export function BuildingDetailView({
@@ -103,6 +73,14 @@ export function BuildingDetailView({
           editHrefFor={(n) => `${base}/mortgages/${n}/edit`}
         />
       </Card>
+
+      <DocumentsCard
+        title="登記簿（建物）"
+        projectId={proj.id}
+        landId={land.id}
+        buildingId={building.id}
+        documents={building.documents}
+      />
 
       <div className="flex justify-end">
         <ConfirmDeleteButton

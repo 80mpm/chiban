@@ -4,7 +4,17 @@
 // ============================================================
 
 import { parcelRing, m2ToTsubo, type GeoJsonPolygon } from "../geo";
-import type { Land, Project, Visit, Building, FrontRoad, Mortgage, Owner, LatLng } from "../types";
+import type {
+  Land,
+  Project,
+  Visit,
+  Building,
+  FrontRoad,
+  Mortgage,
+  Owner,
+  LatLng,
+  RegistryDocument,
+} from "../types";
 
 /**
  * numeric → JSON 数値。postgres.js は numeric を文字列で返すため数値化する。
@@ -83,8 +93,11 @@ export function mortgagesJson(rows: MortgageRow[]): Mortgage[] {
   return rows.map((m) => ({ date: m.date, amount: num(m.amount), holder: m.holder }));
 }
 
-export function buildingJson(row: BuildingRow): Building {
-  return {
+export function buildingJson(
+  row: BuildingRow,
+  documents?: RegistryDocument[],
+): Building {
+  const building: Building = {
     id: row.id,
     location: row.location,
     kaokuNumber: row.kaoku_number,
@@ -98,6 +111,8 @@ export function buildingJson(row: BuildingRow): Building {
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
   };
+  if (documents !== undefined) building.documents = documents;
+  return building;
 }
 
 /** _LAND_SELECT が返す行（lands × parcels × chibankuiki の JOIN + owners 集約）。 */
@@ -117,7 +132,12 @@ export interface LandRow {
   geometry: GeoJsonPolygon;
 }
 
-export function landJson(row: LandRow, visits?: Visit[], buildings?: Building[]): Land {
+export function landJson(
+  row: LandRow,
+  visits?: Visit[],
+  buildings?: Building[],
+  documents?: RegistryDocument[],
+): Land {
   const areaM2 = num(row.area_m2);
   const land: Land = {
     id: row.id,
@@ -136,6 +156,7 @@ export function landJson(row: LandRow, visits?: Visit[], buildings?: Building[])
   };
   if (visits !== undefined) land.visits = visits;
   if (buildings !== undefined) land.buildings = buildings;
+  if (documents !== undefined) land.documents = documents;
   return land;
 }
 

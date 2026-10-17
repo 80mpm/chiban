@@ -8,6 +8,7 @@ import { ensureDbReady } from "../db/init";
 import { ApiError } from "../api-error";
 import { parseProjectId } from "./helpers";
 import { fetchBuildingsByLand } from "./buildings";
+import { fetchDocumentsByLand } from "./documents";
 import { ownersSelect } from "./owners";
 import { mortgagesSelect } from "./mortgages";
 import {
@@ -18,7 +19,7 @@ import {
   type ProjectRow,
   type VisitRow,
 } from "./serialize";
-import type { Project, Visit, Land, Building } from "../types";
+import type { Project, Visit, Land, Building, RegistryDocument } from "../types";
 
 /**
  * lands × parcels × chibankuiki を JOIN し、owners / mortgages を子テーブルから
@@ -55,14 +56,23 @@ export async function getProjectsTree(): Promise<Project[]> {
   }
 
   const buildingsByLand = await fetchBuildingsByLand(sql);
+  const documentsByLand = await fetchDocumentsByLand(sql);
   const emptyBuildings: Building[] = [];
+  const emptyDocuments: RegistryDocument[] = [];
 
   const landsByProj = new Map<number, Land[]>();
   for (const l of landRows) {
     if (!landsByProj.has(l.project_id)) landsByProj.set(l.project_id, []);
     landsByProj
       .get(l.project_id)!
-      .push(landJson(l, visitsByLand.get(l.id) ?? [], buildingsByLand.get(l.id) ?? emptyBuildings));
+      .push(
+        landJson(
+          l,
+          visitsByLand.get(l.id) ?? [],
+          buildingsByLand.get(l.id) ?? emptyBuildings,
+          documentsByLand.get(l.id) ?? emptyDocuments,
+        ),
+      );
   }
 
   return projRows.map((p) => projectJson(p, landsByProj.get(p.id) ?? []));

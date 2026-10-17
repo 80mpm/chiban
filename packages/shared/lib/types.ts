@@ -33,6 +33,24 @@ export interface Mortgage {
   holder: string;
 }
 
+/**
+ * 登記簿等の添付ファイル（メタデータのみ）。
+ * ファイル本体は API のダウンロードエンドポイントから取得する。
+ */
+export interface RegistryDocument {
+  id: string;
+  /** 元のファイル名（表示・ダウンロード名）。 */
+  fileName: string;
+  /** MIME タイプ（application/pdf・image/jpeg・image/png）。 */
+  contentType: string;
+  /** バイト数。 */
+  byteSize: number;
+  /** アップロードしたユーザーの表示名。 */
+  uploadedBy: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 /** 建物。土地とは別に登記され、地権者も土地と異なりうる（借地上建物など）。 */
 export interface Building {
   id: string;
@@ -54,6 +72,8 @@ export interface Building {
   owners: Owner[];
   /** 抵当権。 */
   mortgages: Mortgage[];
+  /** 建物の登記簿等の添付ファイル。読み出し時に付与。 */
+  documents?: RegistryDocument[];
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -100,6 +120,8 @@ export interface Land {
   visits?: Visit[];
   /** 土地上の建物（更地は空配列）。読み出し時に付与。 */
   buildings?: Building[];
+  /** 土地の登記簿等の添付ファイル。読み出し時に付与。 */
+  documents?: RegistryDocument[];
 }
 
 /** 案件。 */

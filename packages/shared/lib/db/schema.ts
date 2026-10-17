@@ -140,6 +140,33 @@ CREATE TABLE IF NOT EXISTS building_mortgages (
 );
 CREATE INDEX IF NOT EXISTS idx_building_mortgages_building ON building_mortgages (building_id, id);
 
+-- 登記簿等の添付ファイル（登記事項証明書のスキャン PDF・画像）。
+-- 土地・建物のどちらか一方に紐づく（登記簿は土地と建物で別々に存在するため）。
+-- バイト列は両アプリが共有する PostgreSQL に置く。ローカルでも Vercel でも
+-- 追加のストレージ契約なしで動くことを優先した選択。将来 Vercel Blob へ移す場合は
+-- data 列を blob_url 列に差し替え、queries/documents.ts だけを変更すればよい。
+CREATE TABLE IF NOT EXISTS registry_documents (
+    id           text PRIMARY KEY,
+    land_id      text REFERENCES lands(id) ON DELETE CASCADE,      -- 土地の登記簿
+    building_id  text REFERENCES buildings(id) ON DELETE CASCADE,  -- 建物の登記簿
+    file_name    text NOT NULL,                  -- 元のファイル名（表示・ダウンロード名）
+    content_type text NOT NULL,                  -- MIME タイプ（application/pdf 等）
+    byte_size    integer NOT NULL,               -- バイト数（一覧表示用。data の長さと一致）
+    data         bytea NOT NULL,                 -- ファイル本体
+    uploaded_by  text NOT NULL DEFAULT '',       -- アップロードしたユーザーの表示名
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    updated_at   timestamptz NOT NULL DEFAULT now(),
+    -- 土地・建物のどちらか一方にだけ紐づくことを担保する
+    CONSTRAINT registry_documents_owner_one CHECK (
+        (land_id IS NOT NULL AND building_id IS NULL)
+     OR (land_id IS NULL AND building_id IS NOT NULL)
+    )
+);
+CREATE INDEX IF NOT EXISTS idx_registry_documents_land
+    ON registry_documents (land_id, created_at, id);
+CREATE INDEX IF NOT EXISTS idx_registry_documents_building
+    ON registry_documents (building_id, created_at, id);
+
 CREATE TABLE IF NOT EXISTS visits (
     id            text PRIMARY KEY,
     land_id       text NOT NULL REFERENCES lands(id) ON DELETE CASCADE,

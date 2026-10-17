@@ -101,3 +101,12 @@ export function fmtDateOnly(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return "";
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
+
+/** バイト数 → 表示用（1KB 未満は B、1MB 未満は KB、それ以上は MB）。 */
+export function fmtBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(Number(bytes))) return "—";
+  const n = Number(bytes);
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}

@@ -13,6 +13,7 @@ import { parseProjectId, parseParcelId } from "./helpers";
 import { replaceOwners } from "./owners";
 import { replaceMortgagesInto } from "./mortgages";
 import { replaceBuildings, fetchBuildingsByLand } from "./buildings";
+import { fetchDocumentsByLand } from "./documents";
 import { LAND_SELECT } from "./projects";
 import { landJson, type LandRow } from "./serialize";
 import type { Building, Land, LandStatus, Mortgage, Owner } from "../types";
@@ -94,7 +95,7 @@ export async function createLand(
     await tx`UPDATE projects SET updated_at = now() WHERE id = ${pid}`;
     const row = await fetchLandJoined(tx, pid, landId);
     const buildings = (await fetchBuildingsByLand(tx, [landId])).get(landId) ?? [];
-    return landJson(row, [], buildings);
+    return landJson(row, [], buildings, []);
   });
 }
 
@@ -178,7 +179,8 @@ export async function updateLand(
     }
     const row = await fetchLandJoined(tx, pid, landId);
     const buildings = (await fetchBuildingsByLand(tx, [landId])).get(landId) ?? [];
-    return landJson(row, undefined, buildings); // visits はクライアント側で保持
+    const documents = (await fetchDocumentsByLand(tx, [landId])).get(landId) ?? [];
+    return landJson(row, undefined, buildings, documents); // visits はクライアント側で保持
   });
 }
 
