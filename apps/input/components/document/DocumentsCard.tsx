@@ -37,7 +37,7 @@ export function DocumentsCard({
   buildingId?: string;
   kind?: DocumentKind;
   documents: RegistryDocument[] | undefined;
-  /** 添付できる上限（建物の登記簿は 1）。上限に達したら「＋ ファイルを添付」を出さない。 */
+  /** 添付できる上限（土地・建物の添付はどれも 1）。上限に達したら「＋ ファイルを添付」を出さない。 */
   maxFiles?: number;
 }) {
   const router = useRouter();

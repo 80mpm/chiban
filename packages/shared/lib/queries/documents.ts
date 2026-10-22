@@ -30,7 +30,7 @@ export const ALLOWED_DOCUMENT_TYPES = [
 /** 案件の公図（筆を描く下地）として受け付ける MIME タイプ。地図に重ねるため画像のみ。 */
 export const ALLOWED_PROJECT_KOUZU_TYPES = ["image/jpeg", "image/png"] as const;
 
-/** 受け付ける種別。公図（kouzu）は土地・案件に添付できる（建物は登記簿のみ）。 */
+/** 受け付ける種別。公図（kouzu）は土地・案件に添付できる（建物は登記簿のみ）。どれも種類ごとに 1 つまで。 */
 const DOCUMENT_KINDS: readonly DocumentKind[] = ["registry", "kouzu"];
 
 /** クエリ文字列等で受け取った種別を検証する（未指定は登記簿）。 */
@@ -121,7 +121,7 @@ export async function fetchDocumentsByLand(
 
 /**
  * 添付ファイルを building_id ごとにまとめて返す（登記簿のみ）。
- * 建物に公図は無いため、かつて建物に添付できた公図（kind = 'kouzu'）は読み出さない。
+ * 建物に公図は無い（かつて添付できた公図の行はスキーマ初期化時に削除済み。念のため kind でも絞る）。
  */
 export async function fetchDocumentsByBuilding(
   db: SqlLike,
@@ -216,9 +216,17 @@ async function assertScope(db: SqlLike, scope: DocumentScope): Promise<void> {
 
 // ----- 書き込み -----
 
+/** 紐づけ先の列に対応する、行ロック用のテーブルと表示名。 */
+const OWNER_TABLES = {
+  project_id: { table: "projects", label: "案件" },
+  land_id: { table: "lands", label: "土地" },
+  building_id: { table: "buildings", label: "建物" },
+} as const;
+
 /**
  * 添付ファイルを追加する（kind 既定は登記簿。案件には下地の公図のみ、建物には登記簿のみ添付できる）。
- * 建物の登記簿は 1 建物につき 1 つまで（2 つ目は 409。差し替えで更新してもらう）。
+ * どの添付も**紐づけ先ごと・種類ごとに 1 つまで**（案件の公図・土地の登記簿・土地の公図・建物の登記簿）。
+ * 2 つ目は 409 にして、差し替えで更新してもらう。
  */
 export async function addDocument(
   scope: DocumentScope,
@@ -233,19 +241,19 @@ export async function addDocument(
     throw new ApiError(400, "建物に添付できるのは登記簿のみです");
   }
   const owner = ownerOf(scope);
+  const { table, label } = OWNER_TABLES[owner.column];
 
   return sql.begin(async (tx) => {
     await assertScope(tx, scope);
-    if (scope.buildingId) {
-      // 同じ建物への同時追加で 2 つ目が入らないよう、建物の行をロックしてから数える
-      await tx`SELECT id FROM buildings WHERE id = ${scope.buildingId} FOR UPDATE`;
-      const [{ n }] = await tx<{ n: number }[]>`
-        SELECT count(*)::int AS n FROM registry_documents
-         WHERE building_id = ${scope.buildingId} AND kind = 'registry'
-      `;
-      if (n > 0) {
-        throw new ApiError(409, "建物の登記簿は 1 つまでです。差し替えで更新してください");
-      }
+    // 同じ紐づけ先への同時追加で 2 つ目が入らないよう、紐づけ先の行をロックしてから数える
+    await tx.unsafe(`SELECT id FROM ${table} WHERE id = $1 FOR UPDATE`, [owner.value] as never[]);
+    const [{ n }] = await tx.unsafe<{ n: number }[]>(
+      `SELECT count(*)::int AS n FROM registry_documents WHERE ${owner.column} = $1 AND kind = $2`,
+      [owner.value, kind] as never[],
+    );
+    if (n > 0) {
+      const what = kind === "kouzu" ? "公図" : "登記簿";
+      throw new ApiError(409, `${label}の${what}は 1 つまでです。差し替えで更新してください`);
     }
     const id = uuid();
     const [row] = await tx.unsafe<DocumentRow[]>(

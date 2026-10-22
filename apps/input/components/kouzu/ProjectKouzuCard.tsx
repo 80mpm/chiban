@@ -18,8 +18,8 @@ const ACCEPT = "image/jpeg,image/png";
 
 /**
  * 案件の公図カード（Issue #44）。筆マスタに無い筆を描くための下地の公図画像を
- * 案件に添付し、地図への位置合わせ・差し替え・削除を行う。位置合わせは 1 枚につき 1 回で、
- * 同じ公図の上で何筆でも描ける。保存後は router.refresh() でサーバコンポーネントを読み直す。
+ * 案件に添付し、地図への位置合わせ・差し替え・削除を行う。公図は 1 案件につき 1 つまでで、
+ * 位置合わせは 1 回、同じ公図の上で何筆でも描ける。保存後は router.refresh() でサーバコンポーネントを読み直す。
  */
 export function ProjectKouzuCard({
   projectId,
@@ -64,11 +64,13 @@ export function ProjectKouzuCard({
           {aligned && (
             <EditLink href={`/projects/${projectId}/lands/new/draw`} label="公図から筆を描く" />
           )}
-          <SmallButton
-            label="＋ 公図を添付"
-            disabled={busy}
-            onClick={() => addInputRef.current?.click()}
-          />
+          {kouzu.length === 0 && (
+            <SmallButton
+              label="＋ 公図を添付"
+              disabled={busy}
+              onClick={() => addInputRef.current?.click()}
+            />
+          )}
         </div>
       }
     >
@@ -102,7 +104,7 @@ export function ProjectKouzuCard({
 
       <p className="mb-2 text-xs text-muted-foreground">
         筆マスタに無い筆は、ここに添付した公図を地図に位置合わせしてから、その上に描いて追加できます
-        （JPEG・PNG／1 ファイル 10MB まで。PDF は画像に変換してください）。
+        （1 案件 1 つまで・JPEG・PNG／1 ファイル 10MB まで。PDF は画像に変換してください）。
       </p>
       {kouzu.length === 0 ? (
         <div className="text-xs text-muted-foreground">添付なし</div>
