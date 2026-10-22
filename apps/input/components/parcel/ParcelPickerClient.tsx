@@ -158,6 +158,14 @@ export function ParcelPickerClient({
             <a href={backHref} className="text-sm text-brand hover:underline">
               キャンセル
             </a>
+            {mode === "add" && (
+              <a
+                href={`/projects/${proj.id}/lands/new/draw`}
+                className="ml-auto text-sm text-brand hover:underline"
+              >
+                筆が見つからないときは公図から描く →
+              </a>
+            )}
           </div>
         </div>
       </div>

@@ -86,6 +86,8 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 | `/projects/[id]/lands/new` | 土地追加＝筆選択（町名プルダウン + 公図ビュー。クリック=選択 → ボタンで確定。成功後は新しい土地詳細へ） |
 | `/projects/[id]/lands/[landId]` | 土地詳細（基本情報・地権者・抵当権・**登記簿**・建物のカード + 各行の編集導線・削除） |
 | `/projects/[id]/lands/[landId]/edit` | 土地編集フォーム（**基本情報のみ**: ステータス/面積/概要。owners/mortgages/buildings キーは送らない） |
+| `/projects/[id]/lands/new/draw` | 土地追加＝**公図から筆を描く**（筆マスタに無い筆用。位置合わせ済みの案件の公図を下地に Leaflet.draw で領域を描き、町名プルダウン + 地番入力で保存。Issue #44） |
+| `/projects/[id]/kouzu/[docId]/align` | 案件の公図の位置合わせ（公図画像を地図に半透明で重ね、中心ハンドル=移動・右上隅ハンドル=拡大縮小と回転、数値入力も可。「保存」で PATCH） |
 | `/projects/[id]/lands/[landId]/parcel` | 筆の変更（筆選択ページの change モード） |
 | `/projects/[id]/lands/[landId]/owners/new`・`owners/[n]/edit` | 土地の地権者を 1 人ずつ追加・編集・削除（`[n]` は並び順 1 始まり。行に ID が無いため） |
 | `/projects/[id]/lands/[landId]/mortgages/new`・`mortgages/[n]/edit` | 土地の抵当権を 1 件ずつ追加・編集・削除 |
@@ -228,13 +230,15 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
 | `POST /api/projects` | 案件作成 |
 | `PATCH /api/projects/:id` | 案件の部分更新（JSON に含めたキーのみ反映。null でクリア） |
 | `DELETE /api/projects/:id` | 案件削除（土地・訪問記録もカスケード削除） |
-| `POST /api/projects/:id/lands` | 土地追加（parcelId 必須。マスタ外 400・案件内重複 409） |
+| `POST /api/projects/:id/lands` | 土地追加（parcelId 必須。マスタ外 400・案件内重複 409）。parcelId の代わりに `manualParcel {town, chiban, polygon}` を渡すと公図から描いた筆を筆マスタへ手動登録してから追加（町名＋地番がマスタに既にあれば 409） |
 | `PATCH /api/projects/:id/lands/:landId` | 土地の部分更新（parcelId 変更で町名・地番・領域・面積㎡を再導出） |
 | `DELETE /api/projects/:id/lands/:landId` | 土地削除 |
 | `POST /api/projects/:id/lands/:landId/documents` | 土地の登記簿を添付（multipart/form-data・PDF/JPEG/PNG・10MB まで） |
 | `GET・PUT・DELETE /api/projects/:id/lands/:landId/documents/:docId` | 土地の登記簿のダウンロード（inline・no-store）・差し替え・削除 |
 | `POST /api/projects/:id/lands/:landId/buildings/:buildingId/documents` | 建物の登記簿を添付。`?kind=kouzu` で公図として添付（不正な kind は 400） |
 | `GET・PUT・DELETE /api/.../buildings/:buildingId/documents/:docId` | 建物の登記簿・公図のダウンロード・差し替え・削除（種別は添付時のまま） |
+| `POST /api/projects/:id/documents` | 案件の公図（筆を描く下地）を添付（multipart/form-data・**JPEG/PNG のみ**・10MB まで。種別は常に公図） |
+| `GET・PUT・PATCH・DELETE /api/projects/:id/documents/:docId` | 案件の公図のダウンロード（地図に重ねる画像の取得にも使う）・差し替え（位置合わせは未設定に戻る）・位置合わせの保存 `{overlay}`（null で未設定）・削除 |
 | `GET /api/users` | 全ユーザー（password_hash は決して返さない） |
 | `POST /api/users` | ユーザー登録 {loginId, name, role, password}（loginId 重複 409） |
 | `PATCH /api/users/:userId` | ユーザーの部分更新 {loginId?, name?, role?, isActive?, password?}（loginId 変更可・重複 409。password でパスワード再設定。削除 API は無し・停止 = isActive:false） |
@@ -316,6 +320,10 @@ apps/input/                   # 案件入力システム（事務用・port 3001
     form/{use-form-submit.ts,FormActions.tsx}    # 保存フロー共通（トースト+遷移 / エラーバナー+保存/キャンセル）
     project/{ProjectListTable,ProjectForm,ProjectDetailView}.tsx
     map/{PolygonDrawMap,AreaMapEditClient}.tsx   # Leaflet.draw 描画 / 領域マップ編集ページ本体
+    map/{KouzuAlignMap,KouzuDrawMap}.tsx         # 公図の位置合わせ地図 / 公図を下地にした筆の描画地図（PolygonDrawMap を流用）
+    map/kouzu-overlay{,-geom}.ts                 # 公図画像の Leaflet レイヤー（CSS matrix で回転・拡縮） / 位置合わせの幾何計算（Leaflet 非依存）
+    kouzu/{ProjectKouzuCard,KouzuAlignClient}.tsx, reference.ts  # 案件詳細の公図カード / 位置合わせページ本体 / 目安の図形
+    land/LandDrawClient.tsx                      # 公図から筆を描いて土地を追加するページ本体
     parcel/ParcelPickerClient.tsx                # 筆選択ページ本体（追加/変更共用）
     land/{LandDetailView,LandForm}.tsx           # LandDetailView は OwnersList/MortgagesList も export
     document/DocumentsCard.tsx                   # 登記簿等の添付カード（土地・建物共用。kind で登記簿/公図を切替。追加/差し替え/削除）
@@ -399,7 +407,9 @@ DEMO バッジ）→ ユーザー名 + ログアウト → サンプルデータ
 - 領域マップ編集は変更をローカルに溜め「保存」で一括 PATCH。頂点数が変わると
   frontRoads をローカルでクリアする（辺インデックスが無効になるため。従来仕様の維持）
 - 筆選択（土地追加・筆変更）は候補筆クリック=選択（青ハイライト）→ ボタンで確定の 2 段階。
-  追加済みの筆は候補から除外され、重複時はサーバの 409 がフォーム上部バナーに出る
+  追加済みの筆は候補から除外され、重複時はサーバの 409 がフォーム上部バナーに出る。
+  筆が見つからないときは同ページ下の「公図から描く」へ（案件の公図を下地に描画。手動の筆は
+  案件詳細の土地一覧に「公図」印、土地詳細に「筆の出所」として表示）
 - 地権者・抵当権は 1 行 = 1 ページで追加・編集・削除する（`owners/new`・`owners/[n]/edit` 等）。
   行に ID が無いため URL は並び順（1 始まり）。範囲外は 404。保存は配列再構築の全置換 PATCH
 
@@ -420,7 +430,13 @@ DEMO バッジ）→ ユーザー名 + ログアウト → サンプルデータ
 - **「領域のない土地」「マスタに存在しない土地」は構造上ありえない**。
   土地追加 API は parcelId 必須（マスタにない場合は 400）で外部キー制約も張られており、
   町名・地番・領域は読み出しのたびに parcels から再導出する
-- 町名・地番・領域の自由入力 UI・自由描画 UI は持たない
+- **例外: データに載っていない筆は「公図から描く」で筆マスタに手動の筆として追加できる**（Issue #44。
+  分筆直後・データが古い等を運用でカバーするため）。手動の筆も parcels の 1 行（`source = 'manual'`）で、
+  町名は住所マスタのプルダウン・地番は入力・領域は**位置合わせ済みの案件の公図を下地にした描画**のみ。
+  土地はこれまでどおり parcelId で参照し、`UNIQUE (chibankuiki_id, chiban)` も維持する
+  （マスタに既にある町名＋地番は 409 で「筆を選択」へ誘導）。筆マスタの配置更新
+  （`refreshParcelGeometryIfStale`）は `source = 'master'` だけを対象にし、手動の筆は上書きしない
+- 上記以外の町名・地番・領域の自由入力 UI・自由描画 UI は持たない（公図の下地なしでは描けない）
 - 任意座標系の140図面は大字・丁目の代表点へ平行移動する近似配置（絶対位置は概算。
   形状・縮尺は実測どおり）。土地ポリゴンは地図に重ねない設計のため実害はない
 - **同一の町に複数の図面がある場合は、重ならないよう東西に並べて配置する**
@@ -481,7 +497,7 @@ DEMO バッジ）→ ユーザー名 + ログアウト → サンプルデータ
 ```
 Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
           address, access, currentFar, targetFar, frontRoads[{edgeIndex, width}], lands[] }
-  └ Land { id, parcelId, aza, chiban, owners[{name, share, address, regDate, regCause, description}],
+  └ Land { id, parcelId, aza, chiban, parcelSource, owners[{name, share, address, regDate, regCause, description}],
            description, areaM2, areaTsubo, mortgages[{date, amount, holder}], status,
            createdAt, updatedAt, polygon[[lat,lng]], visits[], buildings[],
            documents[{id, kind, fileName, contentType, byteSize, uploadedBy, createdAt, updatedAt}] }
@@ -510,12 +526,12 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `prefectures` | id (IDENTITY PK), jis_code (UNIQUE), name | 都道府県マスタ |
 | `shikuchoson` | id (IDENTITY PK), prefecture_id (FK), jis_code (UNIQUE), name | 市区町村マスタ |
 | `chibankuiki` | id (IDENTITY PK), shikuchoson_id (FK), choaza_code, name, lat, lng | 地番区域（大字町丁目）マスタ。`UNIQUE (shikuchoson_id, choaza_code)`・`UNIQUE (shikuchoson_id, name)`。`13106_2025.csv` から投入 |
-| `parcels` | id (IDENTITY PK), chibankuiki_id (FK), chiban, geometry (jsonb) | 筆マスタ。`kouzu_parcels_seed.json.gz`（なければ `kouzu_xml_data.js`）から COPY で投入。`UNIQUE (chibankuiki_id, chiban)` |
+| `parcels` | id (IDENTITY PK), chibankuiki_id (FK), chiban, geometry (jsonb), source ('master'/'manual') | 筆マスタ。`kouzu_parcels_seed.json.gz`（なければ `kouzu_xml_data.js`）から COPY で投入。`UNIQUE (chibankuiki_id, chiban)`。`source = 'manual'` は案件の公図から描いて手動登録した筆（2026-10 追加列・既定 `'master'`。Issue #44） |
 | `projects` | id (IDENTITY), name, description, polygon (jsonb), address, access, current_far, target_far, front_roads (jsonb), created_at, updated_at | 案件。API では id を文字列で返す |
 | `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_m2, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)`。地権者は `land_owners`、抵当権は `land_mortgages` に正規化 |
 | `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
 | `buildings` | id (`id_xxxx`), land_id (FK), location, kaoku_number, structure, usage, floor_area, built_date, description, resident_owner_match, created_at, updated_at | 建物（土地の子）。`resident_owner_match` は `CHECK` で `'match'/'mismatch'/'unknown'` に限定（既定 `'unknown'`。既存 DB には `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` で追随）。地権者は `building_owners`、抵当権は `building_mortgages` に正規化 |
-| `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), kind ('registry'/'kouzu'), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK` で土地・建物のどちらか一方にだけ紐づくことを担保。`kind` は種別（既定 `'registry'` = 登記簿・`'kouzu'` = 公図。2026-10 に `ADD COLUMN IF NOT EXISTS` で追加し既存行は登記簿扱い）。公図は建物にのみ添付でき、土地の読み出しは登記簿だけを返す。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
+| `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), project_id (FK・nullable), kind ('registry'/'kouzu'), overlay (jsonb), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK (num_nonnulls(land_id, building_id, project_id) = 1)` で土地・建物・案件のいずれか 1 つにだけ紐づくことを担保（2026-10 に旧制約 `registry_documents_owner_one` を `DO` ブロックで差し替え）。案件に紐づくのは筆を描く下地の公図（JPEG/PNG のみ）で、`overlay` に地図上の位置合わせ `{center, metersPerPixel, rotationDeg, opacity, imageWidth, imageHeight}` を持つ（画像の差し替えで NULL に戻る。Issue #44）。`kind` は種別（既定 `'registry'` = 登記簿・`'kouzu'` = 公図。2026-10 に `ADD COLUMN IF NOT EXISTS` で追加し既存行は登記簿扱い）。公図は建物にのみ添付でき、土地の読み出しは登記簿だけを返す。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
 | `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。デモアカウント **`id` / `pass`**（種別=事務なので閲覧・入力の両方に入れる）は既存 DB にも毎回冪等に用意する。氏名入りの初期アカウント（honda=営業・パスワード `demo1234`）は users が空のときだけ投入（kimura・sato は廃止）。**`POST /api/reset` では消えない** |
 | `sessions` | token (PK), user_id (FK・CASCADE), created_at | ログインセッション（無期限。失効はログアウトと停止のみ） |
@@ -539,6 +555,8 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
   差し替え・削除。入力システムのみ。閲覧システムには添付の API・UI を持たない）
 - できること（続き）: 建物への公図ファイルの添付（建物詳細の「公図」カード。登記簿とは別カードで、
   対応形式・操作は登記簿と同じ。Issue #42）
+- できること（続き）: 筆マスタに無い筆の登録（案件詳細の「公図」カードに公図画像を添付 → 位置合わせ →
+  「公図から筆を描く」で描画して土地を追加。入力システムのみ。Issue #44）
 - できること（続き）: ログイン/ログアウト（両システム。全ページ・全 API を保護）
 - できないこと: 訪問記録の編集・削除（履歴のため不可）、ユーザーの削除（停止のみ）
 

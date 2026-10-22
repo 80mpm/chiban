@@ -20,6 +20,8 @@ import type {
   UserRole,
   RegistryDocument,
   DocumentKind,
+  KouzuOverlay,
+  ManualParcelInput,
 } from "./types";
 
 async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -70,7 +72,9 @@ export const deleteProject = (projectId: string) =>
 export const createLand = (
   projectId: string,
   fields: {
-    parcelId: number;
+    /** 筆マスタの筆。公図から描いた筆を登録するときは代わりに manualParcel を渡す。 */
+    parcelId?: number;
+    manualParcel?: ManualParcelInput;
     status?: LandStatus;
     owners?: Owner[];
     description?: string;
@@ -166,6 +170,36 @@ export function documentsPath(
     ? `${base}/buildings/${encodeURIComponent(buildingId)}/documents`
     : `${base}/documents`;
 }
+
+/** 案件の公図（筆を描く下地の画像）のベースパス。画像の src・ダウンロードにも使う。 */
+export const projectKouzuPath = (projectId: string) =>
+  `/api/projects/${encodeURIComponent(projectId)}/documents`;
+
+export const uploadProjectKouzu = (projectId: string, file: File) =>
+  upload<RegistryDocument>("POST", projectKouzuPath(projectId), file);
+
+/** 画像を差し替える（位置合わせは未設定に戻る）。 */
+export const replaceProjectKouzu = (projectId: string, documentId: string, file: File) =>
+  upload<RegistryDocument>(
+    "PUT",
+    `${projectKouzuPath(projectId)}/${encodeURIComponent(documentId)}`,
+    file,
+  );
+
+export const deleteProjectKouzu = (projectId: string, documentId: string) =>
+  api<null>("DELETE", `${projectKouzuPath(projectId)}/${encodeURIComponent(documentId)}`);
+
+/** 公図の地図上の位置合わせを保存する（null で未設定に戻す）。 */
+export const updateProjectKouzuOverlay = (
+  projectId: string,
+  documentId: string,
+  overlay: KouzuOverlay | null,
+) =>
+  api<RegistryDocument>(
+    "PATCH",
+    `${projectKouzuPath(projectId)}/${encodeURIComponent(documentId)}`,
+    { overlay },
+  );
 
 export const uploadDocument = (
   projectId: string,

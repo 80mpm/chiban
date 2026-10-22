@@ -125,6 +125,7 @@ export interface LandRow {
   parcel_id: number;
   aza: string;
   chiban: string;
+  parcel_source: Land["parcelSource"];
   owners: Owner[];
   mortgages: MortgageRow[];
   description: string;
@@ -147,6 +148,7 @@ export function landJson(
     parcelId: row.parcel_id,
     aza: row.aza,
     chiban: row.chiban,
+    parcelSource: row.parcel_source,
     owners: row.owners,
     mortgages: mortgagesJson(row.mortgages),
     description: row.description,

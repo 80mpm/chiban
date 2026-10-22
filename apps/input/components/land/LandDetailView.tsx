@@ -111,6 +111,12 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
 
       <Card title="基本情報" action={<EditLink href={`${base}/edit`} label="編集" />}>
         <dl className="grid grid-cols-[96px_1fr] items-baseline gap-x-3 gap-y-2">
+          <dt className="text-[11px] text-muted-foreground">筆の出所</dt>
+          <dd className="text-sm">
+            {land.parcelSource === "manual"
+              ? "公図から描いた筆（筆マスタに手動で登録）"
+              : "登記所備付地図データ"}
+          </dd>
           <dt className="text-[11px] text-muted-foreground">面積</dt>
           <dd className="text-sm">
             {land.areaM2 != null

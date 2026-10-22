@@ -57,6 +57,32 @@ export interface RegistryDocument {
   uploadedBy: string;
   createdAt: string | null;
   updatedAt: string | null;
+  /** 案件の公図のみ: 地図上の位置合わせ（未設定は null）。土地・建物の添付には付かない。 */
+  overlay?: KouzuOverlay | null;
+}
+
+/**
+ * 案件の公図画像を地図に重ねるための位置合わせ（Issue #44）。
+ * 画像の中心を center に置き、1 画素 = metersPerPixel メートルに拡大縮小し、
+ * 北上から時計回りに rotationDeg 度回す。画像の画素数は位置合わせ時点のもので、
+ * 差し替えで画像が変わったら位置合わせはやり直す（サーバが null に戻す）。
+ */
+export interface KouzuOverlay {
+  center: LatLng;
+  metersPerPixel: number;
+  rotationDeg: number;
+  /** 不透明度（0〜1）。描画画面の初期値として使う。 */
+  opacity: number;
+  imageWidth: number;
+  imageHeight: number;
+}
+
+/** 公図から描いた筆で土地を追加するときの入力（筆マスタに手動の筆として登録される）。 */
+export interface ManualParcelInput {
+  /** 地番区域名（chibankuiki.name）。 */
+  town: string;
+  chiban: string;
+  polygon: LatLng[];
 }
 
 /** 建物。土地とは別に登記され、地権者も土地と異なりうる（借地上建物など）。 */
@@ -115,6 +141,8 @@ export interface Land {
   /** 地番区域名（chibankuiki.name。例「西浅草二丁目」）。 */
   aza: string;
   chiban: string;
+  /** 筆の出所（master = 登記所備付地図データ / manual = 案件の公図から描いた筆）。 */
+  parcelSource: "master" | "manual";
   owners: Owner[];
   description: string;
   /** 面積（㎡・保存値の正本。登記の地積単位）。 */

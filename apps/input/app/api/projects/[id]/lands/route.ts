@@ -1,4 +1,4 @@
-// POST /api/projects/:id/lands — 土地追加（parcelId 必須）
+// POST /api/projects/:id/lands — 土地追加（parcelId か、公図から描いた筆の manualParcel のどちらかが必須）
 
 import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
 import { readJsonBody } from "@chiban/shared/lib/request";
