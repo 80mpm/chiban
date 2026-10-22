@@ -92,7 +92,7 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 | `/projects/[id]/lands/[landId]/owners/new`・`owners/[n]/edit` | 土地の地権者を 1 人ずつ追加・編集・削除（`[n]` は並び順 1 始まり。行に ID が無いため） |
 | `/projects/[id]/lands/[landId]/mortgages/new`・`mortgages/[n]/edit` | 土地の抵当権を 1 件ずつ追加・編集・削除 |
 | `/projects/[id]/lands/[landId]/buildings/new` | 建物追加フォーム（基本情報のみ。作成後は新建物の詳細へ） |
-| `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の地権者・抵当権・**登記簿**・**公図**カード + 削除） |
+| `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の地権者・抵当権・**登記簿**カード〔1 建物 1 つまで〕 + 削除） |
 | `/projects/[id]/lands/[landId]/buildings/[buildingId]/edit` | 建物の基本情報の編集フォーム |
 | `.../buildings/[buildingId]/owners/...`・`mortgages/...` | 建物の地権者・抵当権の行単位ページ（土地側と同型） |
 | `/users` | ユーザー管理（一覧。種別フィルタタブ「すべて/営業/事務」= Issue #22/#23。案件一覧ヘッダから遷移） |
@@ -235,8 +235,8 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
 | `DELETE /api/projects/:id/lands/:landId` | 土地削除 |
 | `POST /api/projects/:id/lands/:landId/documents` | 土地の登記簿・公図を添付（multipart/form-data・PDF/JPEG/PNG・10MB まで。公図は `?kind=kouzu`） |
 | `GET・PUT・DELETE /api/projects/:id/lands/:landId/documents/:docId` | 土地の登記簿のダウンロード（inline・no-store）・差し替え・削除 |
-| `POST /api/projects/:id/lands/:landId/buildings/:buildingId/documents` | 建物の登記簿を添付。`?kind=kouzu` で公図として添付（不正な kind は 400） |
-| `GET・PUT・DELETE /api/.../buildings/:buildingId/documents/:docId` | 建物の登記簿・公図のダウンロード・差し替え・削除（種別は添付時のまま） |
+| `POST /api/projects/:id/lands/:landId/buildings/:buildingId/documents` | 建物の登記簿を添付（**1 建物につき 1 つまで**。2 つ目は 409 で差し替えへ誘導。建物に公図は無いため `?kind=kouzu` は 400） |
+| `GET・PUT・DELETE /api/.../buildings/:buildingId/documents/:docId` | 建物の登記簿のダウンロード・差し替え・削除 |
 | `POST /api/projects/:id/documents` | 案件の公図（筆を描く下地）を添付（multipart/form-data・**JPEG/PNG のみ**・10MB まで。種別は常に公図） |
 | `GET・PUT・PATCH・DELETE /api/projects/:id/documents/:docId` | 案件の公図のダウンロード（地図に重ねる画像の取得にも使う）・差し替え（位置合わせは未設定に戻る）・位置合わせの保存 `{overlay}`（null で未設定）・削除 |
 | `GET /api/users` | 全ユーザー（password_hash は決して返さない） |
@@ -531,7 +531,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_m2, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)`。地権者は `land_owners`、抵当権は `land_mortgages` に正規化 |
 | `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
 | `buildings` | id (`id_xxxx`), land_id (FK), location, kaoku_number, structure, usage, floor_area, built_date, description, resident_owner_match, created_at, updated_at | 建物（土地の子）。`resident_owner_match` は `CHECK` で `'match'/'mismatch'/'unknown'` に限定（既定 `'unknown'`。既存 DB には `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` で追随）。地権者は `building_owners`、抵当権は `building_mortgages` に正規化 |
-| `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), project_id (FK・nullable), kind ('registry'/'kouzu'), overlay (jsonb), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK (num_nonnulls(land_id, building_id, project_id) = 1)` で土地・建物・案件のいずれか 1 つにだけ紐づくことを担保（2026-10 に旧制約 `registry_documents_owner_one` を `DO` ブロックで差し替え）。案件に紐づくのは筆を描く下地の公図（JPEG/PNG のみ）で、`overlay` に地図上の位置合わせ `{center, metersPerPixel, rotationDeg, opacity, imageWidth, imageHeight}` を持つ（画像の差し替えで NULL に戻る。Issue #44）。`kind` は種別（既定 `'registry'` = 登記簿・`'kouzu'` = 公図。2026-10 に `ADD COLUMN IF NOT EXISTS` で追加し既存行は登記簿扱い）。公図は土地・建物・案件のいずれにも添付でき、土地・建物の読み出しは登記簿・公図の両方を返す（画面側で kind ごとにカードを分ける）。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
+| `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), project_id (FK・nullable), kind ('registry'/'kouzu'), overlay (jsonb), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK (num_nonnulls(land_id, building_id, project_id) = 1)` で土地・建物・案件のいずれか 1 つにだけ紐づくことを担保（2026-10 に旧制約 `registry_documents_owner_one` を `DO` ブロックで差し替え）。案件に紐づくのは筆を描く下地の公図（JPEG/PNG のみ）で、`overlay` に地図上の位置合わせ `{center, metersPerPixel, rotationDeg, opacity, imageWidth, imageHeight}` を持つ（画像の差し替えで NULL に戻る。Issue #44）。`kind` は種別（既定 `'registry'` = 登記簿・`'kouzu'` = 公図。2026-10 に `ADD COLUMN IF NOT EXISTS` で追加し既存行は登記簿扱い）。公図は土地・案件に添付でき、土地の読み出しは登記簿・公図の両方を返す（画面側で kind ごとにカードを分ける）。**建物は登記簿のみ・1 建物につき 1 つまで**（追加時に建物の行を `FOR UPDATE` でロックして数え、2 つ目は 409）。かつて建物に添付できた公図（Issue #42）は廃止し、建物の読み出しは `kind = 'registry'` だけを返す（既存の行は残るが画面には出ない）。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
 | `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。デモアカウント **`id` / `pass`**（種別=事務なので閲覧・入力の両方に入れる）は既存 DB にも毎回冪等に用意する。氏名入りの初期アカウント（honda=営業・パスワード `demo1234`）は users が空のときだけ投入（kimura・sato は廃止）。**`POST /api/reset` では消えない** |
 | `sessions` | token (PK), user_id (FK・CASCADE), created_at | ログインセッション（無期限。失効はログアウトと停止のみ） |
@@ -553,8 +553,8 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
   ユーザー管理（登録・停止/再開・パスワード再設定。入力システムの `/users`）
 - できること（続き）: 土地・建物への登記簿等の添付（PDF/JPEG/PNG・10MB まで。追加・ダウンロード・
   差し替え・削除。入力システムのみ。閲覧システムには添付の API・UI を持たない）
-- できること（続き）: 土地・建物への公図ファイルの添付（土地詳細・建物詳細の「公図」カード。登記簿とは別カードで、
-  対応形式・操作は登記簿と同じ。Issue #42）
+- できること（続き）: 土地への公図ファイルの添付（土地詳細の「公図（土地）」カード。登記簿とは別カードで、
+  対応形式・操作は登記簿と同じ）。建物は登記簿のみで 1 建物につき 1 つまで（建物の公図は無い）
 - できること（続き）: 筆マスタに無い筆の登録（案件詳細の「公図」カードに公図画像を添付 → 位置合わせ →
   「公図から筆を描く」で描画して土地を追加。入力システムのみ。Issue #44）
 - できること（続き）: ログイン/ログアウト（両システム。全ページ・全 API を保護）

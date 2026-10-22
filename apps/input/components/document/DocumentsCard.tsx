@@ -19,7 +19,7 @@ const ACCEPT = "application/pdf,image/jpeg,image/png";
 /**
  * 登記簿等の添付ファイルのカード（土地・建物共用）。
  * buildingId を渡すと建物の添付になる。kind（既定 registry=登記簿）で種別を選び、
- * documents のうちその種別のものだけを表示・追加する（土地・建物とも登記簿と公図の 2 枚並べる）。保存後は router.refresh() で
+ * documents のうちその種別のものだけを表示・追加する（土地は登記簿と公図の 2 枚、建物は登記簿 1 枚）。保存後は router.refresh() で
  * サーバコンポーネントを読み直す（入力システムはキャッシュを持たない方針）。
  */
 export function DocumentsCard({
@@ -29,6 +29,7 @@ export function DocumentsCard({
   buildingId,
   kind = "registry",
   documents,
+  maxFiles,
 }: {
   title: string;
   projectId: string;
@@ -36,6 +37,8 @@ export function DocumentsCard({
   buildingId?: string;
   kind?: DocumentKind;
   documents: RegistryDocument[] | undefined;
+  /** 添付できる上限（建物の登記簿は 1）。上限に達したら「＋ ファイルを添付」を出さない。 */
+  maxFiles?: number;
 }) {
   const router = useRouter();
   const addInputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +46,8 @@ export function DocumentsCard({
   const replaceTargetId = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
   const docs = (documents ?? []).filter((d) => d.kind === kind);
+  const full = maxFiles !== undefined && docs.length >= maxFiles;
+  const limitText = maxFiles === 1 ? "1 つまで" : maxFiles !== undefined ? `${maxFiles} ファイルまで` : "";
   const basePath = documentsPath(projectId, landId, buildingId);
 
   async function run(action: () => Promise<unknown>, successMessage: string) {
@@ -69,11 +74,13 @@ export function DocumentsCard({
     <Card
       title={`${title}（${docs.length}）`}
       action={
-        <SmallButton
-          label="＋ ファイルを添付"
-          disabled={busy}
-          onClick={() => addInputRef.current?.click()}
-        />
+        full ? undefined : (
+          <SmallButton
+            label="＋ ファイルを添付"
+            disabled={busy}
+            onClick={() => addInputRef.current?.click()}
+          />
+        )
       }
     >
       <input
@@ -109,7 +116,7 @@ export function DocumentsCard({
 
       {docs.length === 0 ? (
         <div className="text-xs text-muted-foreground">
-          添付なし（PDF・JPEG・PNG／1 ファイル 10MB まで）
+          添付なし（PDF・JPEG・PNG／1 ファイル 10MB まで{limitText && `・${limitText}`}）
         </div>
       ) : (
         <ul className="space-y-1.5">
