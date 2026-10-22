@@ -91,15 +91,7 @@ export function BuildingDetailView({
         landId={land.id}
         buildingId={building.id}
         documents={building.documents}
-      />
-
-      <DocumentsCard
-        title="公図"
-        projectId={proj.id}
-        landId={land.id}
-        buildingId={building.id}
-        kind="kouzu"
-        documents={building.documents}
+        maxFiles={1}
       />
 
       <div className="flex justify-end">

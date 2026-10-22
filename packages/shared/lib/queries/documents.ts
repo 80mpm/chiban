@@ -30,7 +30,7 @@ export const ALLOWED_DOCUMENT_TYPES = [
 /** 案件の公図（筆を描く下地）として受け付ける MIME タイプ。地図に重ねるため画像のみ。 */
 export const ALLOWED_PROJECT_KOUZU_TYPES = ["image/jpeg", "image/png"] as const;
 
-/** 受け付ける種別。公図（kouzu）は土地・建物・案件のいずれにも添付できる。 */
+/** 受け付ける種別。公図（kouzu）は土地・案件に添付できる（建物は登記簿のみ）。 */
 const DOCUMENT_KINDS: readonly DocumentKind[] = ["registry", "kouzu"];
 
 /** クエリ文字列等で受け取った種別を検証する（未指定は登記簿）。 */
@@ -119,7 +119,10 @@ export async function fetchDocumentsByLand(
   return byLand;
 }
 
-/** 添付ファイルを building_id ごとにまとめて返す（登記簿・公図の両方。画面側で kind ごとに分ける）。 */
+/**
+ * 添付ファイルを building_id ごとにまとめて返す（登記簿のみ）。
+ * 建物に公図は無いため、かつて建物に添付できた公図（kind = 'kouzu'）は読み出さない。
+ */
 export async function fetchDocumentsByBuilding(
   db: SqlLike,
   buildingIds?: string[],
@@ -127,12 +130,12 @@ export async function fetchDocumentsByBuilding(
   const rows = buildingIds
     ? await db.unsafe<(DocumentRow & { building_id: string })[]>(
         `SELECT building_id, ${META_COLUMNS} FROM registry_documents
-          WHERE building_id = ANY($1) ORDER BY building_id, created_at, id`,
+          WHERE building_id = ANY($1) AND kind = 'registry' ORDER BY building_id, created_at, id`,
         [buildingIds] as never[],
       )
     : await db.unsafe<(DocumentRow & { building_id: string })[]>(
         `SELECT building_id, ${META_COLUMNS} FROM registry_documents
-          WHERE building_id IS NOT NULL ORDER BY building_id, created_at, id`,
+          WHERE building_id IS NOT NULL AND kind = 'registry' ORDER BY building_id, created_at, id`,
       );
   const byBuilding = new Map<string, RegistryDocument[]>();
   for (const row of rows) {
@@ -213,7 +216,10 @@ async function assertScope(db: SqlLike, scope: DocumentScope): Promise<void> {
 
 // ----- 書き込み -----
 
-/** 添付ファイルを追加する（kind 既定は登記簿。案件には下地の公図のみ添付できる）。 */
+/**
+ * 添付ファイルを追加する（kind 既定は登記簿。案件には下地の公図のみ、建物には登記簿のみ添付できる）。
+ * 建物の登記簿は 1 建物につき 1 つまで（2 つ目は 409。差し替えで更新してもらう）。
+ */
 export async function addDocument(
   scope: DocumentScope,
   file: UploadedFile,
@@ -223,10 +229,24 @@ export async function addDocument(
   await ensureDbReady();
   assertUploadable(file, scope);
   if (!scope.landId) kind = "kouzu"; // 案件に添付できるのは下地の公図だけ
+  if (scope.buildingId && kind !== "registry") {
+    throw new ApiError(400, "建物に添付できるのは登記簿のみです");
+  }
   const owner = ownerOf(scope);
 
   return sql.begin(async (tx) => {
     await assertScope(tx, scope);
+    if (scope.buildingId) {
+      // 同じ建物への同時追加で 2 つ目が入らないよう、建物の行をロックしてから数える
+      await tx`SELECT id FROM buildings WHERE id = ${scope.buildingId} FOR UPDATE`;
+      const [{ n }] = await tx<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM registry_documents
+         WHERE building_id = ${scope.buildingId} AND kind = 'registry'
+      `;
+      if (n > 0) {
+        throw new ApiError(409, "建物の登記簿は 1 つまでです。差し替えで更新してください");
+      }
+    }
     const id = uuid();
     const [row] = await tx.unsafe<DocumentRow[]>(
       `INSERT INTO registry_documents
