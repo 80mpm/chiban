@@ -45,7 +45,7 @@ export type DocumentKind = "registry" | "kouzu";
  */
 export interface RegistryDocument {
   id: string;
-  /** 種別。土地は登記簿・公図、建物は登記簿のみ（1 つまで）、案件は下地の公図のみ。 */
+  /** 種別。土地は登記簿・公図（公図は 1 つまで）、建物は登記簿のみ（1 つまで）、案件は下地の公図のみ。 */
   kind: DocumentKind;
   /** 元のファイル名（表示・ダウンロード名）。 */
   fileName: string;

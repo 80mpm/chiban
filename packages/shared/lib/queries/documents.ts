@@ -218,7 +218,7 @@ async function assertScope(db: SqlLike, scope: DocumentScope): Promise<void> {
 
 /**
  * 添付ファイルを追加する（kind 既定は登記簿。案件には下地の公図のみ、建物には登記簿のみ添付できる）。
- * 建物の登記簿は 1 建物につき 1 つまで（2 つ目は 409。差し替えで更新してもらう）。
+ * 建物の登記簿・土地の公図は、それぞれ 1 建物・1 土地につき 1 つまで（2 つ目は 409。差し替えで更新してもらう）。
  */
 export async function addDocument(
   scope: DocumentScope,
@@ -245,6 +245,16 @@ export async function addDocument(
       `;
       if (n > 0) {
         throw new ApiError(409, "建物の登記簿は 1 つまでです。差し替えで更新してください");
+      }
+    } else if (scope.landId && kind === "kouzu") {
+      // 土地の公図も 1 土地につき 1 つ。建物と同じく土地の行をロックしてから数える
+      await tx`SELECT id FROM lands WHERE id = ${scope.landId} FOR UPDATE`;
+      const [{ n }] = await tx<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM registry_documents
+         WHERE land_id = ${scope.landId} AND kind = 'kouzu'
+      `;
+      if (n > 0) {
+        throw new ApiError(409, "土地の公図は 1 つまでです。差し替えで更新してください");
       }
     }
     const id = uuid();

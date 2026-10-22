@@ -159,6 +159,7 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
         landId={land.id}
         kind="kouzu"
         documents={land.documents}
+        maxFiles={1}
       />
 
       <Card
