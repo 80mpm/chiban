@@ -210,7 +210,7 @@ export const uploadDocument = (
 ) =>
   upload<RegistryDocument>(
     "POST",
-    // 公図は建物にのみ添付でき、種別をクエリで渡す（既定の登記簿は付けない）
+    // 公図は種別をクエリで渡す（既定の登記簿は付けない）
     documentsPath(projectId, landId, buildingId) + (kind === "registry" ? "" : `?kind=${kind}`),
     file,
   );
