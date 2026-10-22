@@ -4,11 +4,12 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { ProjectKouzuCard } from "@/components/kouzu/ProjectKouzuCard";
 import { ConfirmDeleteButton } from "@/components/ConfirmDeleteButton";
 import { KouzuView } from "@chiban/shared/components/kouzu/KouzuView";
 import { deleteProject } from "@chiban/shared/lib/data-client";
 import { formatOwners, fmtDateOnly, fmtDateTime, fmtTsubo, STATUS_DEFS } from "@chiban/shared/lib/format";
-import type { Project, Land } from "@chiban/shared/lib/types";
+import type { Project, Land, RegistryDocument } from "@chiban/shared/lib/types";
 
 // Leaflet は window 前提なので SSR 無効で読み込む
 const ProjectAreaMap = dynamic(
@@ -62,7 +63,14 @@ function EditLink({ href, label }: { href: string; label: string }) {
 }
 
 /** 案件詳細（読み取り専用ハブ）。各リソースの編集ページへの導線を持つ。 */
-export function ProjectDetailView({ proj }: { proj: Project }) {
+export function ProjectDetailView({
+  proj,
+  kouzu,
+}: {
+  proj: Project;
+  /** 案件の公図（筆を描く下地。Issue #44）。 */
+  kouzu: RegistryDocument[];
+}) {
   const router = useRouter();
   const lands = proj.lands ?? [];
   const viewerOrigin = process.env.NEXT_PUBLIC_VIEWER_ORIGIN;
@@ -163,7 +171,17 @@ export function ProjectDetailView({ proj }: { proj: Project }) {
                       onClick={() => router.push(`/projects/${proj.id}/lands/${l.id}`)}
                       className="cursor-pointer border-b border-border last:border-b-0 hover:bg-[color:var(--app-bg)]"
                     >
-                      <td className="px-2 py-1.5 font-medium text-brand">{landTitle(l)}</td>
+                      <td className="px-2 py-1.5 font-medium text-brand">
+                        {landTitle(l)}
+                        {l.parcelSource === "manual" && (
+                          <span
+                            title="公図から描いた筆"
+                            className="ml-1.5 rounded border border-border px-1 text-[10px] font-normal text-muted-foreground"
+                          >
+                            公図
+                          </span>
+                        )}
+                      </td>
                       <td className="px-2 py-1.5">
                         <span
                           className="rounded px-1.5 py-0.5 text-[11px] font-medium text-white"
@@ -189,6 +207,9 @@ export function ProjectDetailView({ proj }: { proj: Project }) {
           </div>
         </div>
       </Card>
+
+      {/* 公図（筆マスタに無い筆を描く下地） */}
+      <ProjectKouzuCard projectId={proj.id} kouzu={kouzu} />
 
       {/* 削除 */}
       <div className="flex justify-end">

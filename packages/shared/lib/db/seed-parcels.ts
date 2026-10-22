@@ -230,6 +230,7 @@ export async function refreshParcelGeometryIfStale(sql: Sql): Promise<boolean> {
          FROM parcel_geom_new n
         WHERE p.chibankuiki_id = n.chibankuiki_id
           AND p.chiban = n.chiban
+          AND p.source = 'master'  -- 公図から手で描いた筆は上書きしない
           AND p.geometry IS DISTINCT FROM n.geometry`,
     );
     updated = res.rowCount ?? 0;

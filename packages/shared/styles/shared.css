@@ -284,6 +284,22 @@ svg .north-mark {
 .leaflet-marker-draggable.leaflet-drag-target .road-width-handle {
   cursor: grabbing;
 }
+/* 公図の位置合わせハンドル（中心=移動・右上隅=拡大縮小と回転。入力システムの公図位置合わせ）*/
+.kouzu-align-handle {
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+}
+.kouzu-align-handle:active {
+  cursor: grabbing;
+}
+.kouzu-align-handle--move {
+  background: #065a82;
+}
+.kouzu-align-handle--rotate {
+  background: #b91c1c;
+}
 
 /* 地図タイル停止中の注記（components/map/base-tile-layer.ts が生成） */
 .map-tiles-disabled-notice {

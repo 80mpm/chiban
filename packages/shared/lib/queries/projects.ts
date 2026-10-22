@@ -28,7 +28,7 @@ import type { Project, Visit, Land, Building, RegistryDocument } from "../types"
  * パラメータを持たないので sql.unsafe で使う。
  */
 export const LAND_SELECT = `
-    SELECT l.*, c.name AS aza, p.chiban, p.geometry,
+    SELECT l.*, c.name AS aza, p.chiban, p.geometry, p.source AS parcel_source,
            ${ownersSelect("land_owners", "land_id", "l")},
            ${mortgagesSelect("land_mortgages", "land_id", "l")}
       FROM lands l

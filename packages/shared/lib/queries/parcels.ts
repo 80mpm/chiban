@@ -20,6 +20,16 @@ export async function getParcelTowns(): Promise<ParcelTown[]> {
 }
 
 /**
+ * 住所マスタの町名（地番区域）すべて。筆の有無を問わない。
+ * 公図から筆を描いて追加するときの町名プルダウン用（筆マスタに無い町も選べる）。
+ */
+export async function getAllTownNames(): Promise<string[]> {
+  await ensureDbReady();
+  const rows = await sql<{ name: string }[]>`SELECT name FROM chibankuiki ORDER BY name`;
+  return rows.map((r) => r.name);
+}
+
+/**
  * 指定町名の筆一覧。属性のみ（parcelId と地番）。
  * withGeometry=true で領域 [[lat,lng]] 付き（土地の追加モードの候補筆表示用）。
  */

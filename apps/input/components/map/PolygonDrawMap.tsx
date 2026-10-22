@@ -59,6 +59,9 @@ export default function PolygonDrawMap({
   onCommitWidth,
   onModeChange,
   heightClassName = "h-[360px]",
+  title = "領域マップ",
+  showEdgeBadges = true,
+  onMapReady,
 }: {
   initialPolygon: LatLng[] | null;
   onChange: (polygon: LatLng[] | null) => void;
@@ -74,6 +77,12 @@ export default function PolygonDrawMap({
   onModeChange?: (mode: "empty" | "drawing" | "editing" | "set") => void;
   /** 地図の高さ（Tailwind クラス。専用ページでは大きくする）。 */
   heightClassName?: string;
+  /** 地図の見出し。 */
+  title?: string;
+  /** 辺番号バッジを出すか（前面道路を扱わない土地の描画では出さない）。 */
+  showEdgeBadges?: boolean;
+  /** 地図の初期化直後に呼ぶ（下地の公図・目安の図形を重ね、表示範囲を合わせる用途）。 */
+  onMapReady?: (map: L.Map) => void;
 }) {
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -125,6 +134,7 @@ export default function PolygonDrawMap({
     }
     arrowLayersRef.current = drawRoadWidthArrows(L, map, pts, roads);
 
+    if (!showEdgeBadges) return;
     for (let i = 0; i < pts.length; i++) {
       const a = L.latLng(pts[i]);
       const b = L.latLng(pts[(i + 1) % pts.length]);
@@ -355,6 +365,7 @@ export default function PolygonDrawMap({
         /* noop */
       }
     }
+    onMapReady?.(map);
     setTimeout(() => map.invalidateSize(), 60);
 
     return () => {
@@ -392,7 +403,7 @@ export default function PolygonDrawMap({
   return (
     <>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[color:var(--app-text-dark)]">領域マップ</h3>
+        <h3 className="text-sm font-semibold text-[color:var(--app-text-dark)]">{title}</h3>
         <div className="flex items-center gap-2">
           <span className={`text-xs ${statusColor}`}>{statusText}</span>
           <button
