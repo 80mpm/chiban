@@ -151,6 +151,7 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
         projectId={proj.id}
         landId={land.id}
         documents={land.documents}
+        maxFiles={1}
       />
 
       <DocumentsCard

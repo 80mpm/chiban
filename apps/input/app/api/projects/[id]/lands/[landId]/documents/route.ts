@@ -1,5 +1,5 @@
 // POST /api/projects/:id/lands/:landId/documents
-// 土地の登記簿・公図を添付（multipart/form-data）。公図は ?kind=kouzu を付ける（1 土地につき 1 つまで・2 つ目は 409）
+// 土地の登記簿・公図を添付（multipart/form-data）。公図は ?kind=kouzu を付ける（それぞれ 1 土地につき 1 つまで・2 つ目は 409）
 
 import { withApi, jsonOk } from "@chiban/shared/lib/api-error";
 import { readUploadFile } from "@chiban/shared/lib/request";

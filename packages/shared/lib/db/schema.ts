@@ -187,6 +187,8 @@ ALTER TABLE registry_documents ADD COLUMN IF NOT EXISTS project_id integer
 ALTER TABLE registry_documents ADD COLUMN IF NOT EXISTS overlay jsonb;
 CREATE INDEX IF NOT EXISTS idx_registry_documents_project
     ON registry_documents (project_id, created_at, id);
+-- 建物に公図は無い（2026-10 廃止）。かつて建物に添付できた公図の行は消す（冪等。2 回目以降は 0 行）
+DELETE FROM registry_documents WHERE building_id IS NOT NULL AND kind = 'kouzu';
 -- 紐づけ先の制約を「土地か建物の一方」から「土地・建物・案件のいずれか 1 つ」へ差し替える
 DO $$
 BEGIN
