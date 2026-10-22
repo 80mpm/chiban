@@ -19,7 +19,7 @@ const ACCEPT = "application/pdf,image/jpeg,image/png";
 /**
  * 登記簿等の添付ファイルのカード（土地・建物共用）。
  * buildingId を渡すと建物の添付になる。kind（既定 registry=登記簿）で種別を選び、
- * documents のうちその種別のものだけを表示・追加する（建物は登記簿と公図の 2 枚並べる）。保存後は router.refresh() で
+ * documents のうちその種別のものだけを表示・追加する（土地・建物とも登記簿と公図の 2 枚並べる）。保存後は router.refresh() で
  * サーバコンポーネントを読み直す（入力システムはキャッシュを持たない方針）。
  */
 export function DocumentsCard({

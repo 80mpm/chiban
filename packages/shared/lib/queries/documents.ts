@@ -30,7 +30,7 @@ export const ALLOWED_DOCUMENT_TYPES = [
 /** 案件の公図（筆を描く下地）として受け付ける MIME タイプ。地図に重ねるため画像のみ。 */
 export const ALLOWED_PROJECT_KOUZU_TYPES = ["image/jpeg", "image/png"] as const;
 
-/** 受け付ける種別。公図（kouzu）は建物・案件にのみ添付できる。 */
+/** 受け付ける種別。公図（kouzu）は土地・建物・案件のいずれにも添付できる。 */
 const DOCUMENT_KINDS: readonly DocumentKind[] = ["registry", "kouzu"];
 
 /** クエリ文字列等で受け取った種別を検証する（未指定は登記簿）。 */
@@ -96,7 +96,7 @@ function documentJson(row: DocumentRow): RegistryDocument {
 
 // ----- 読み出し（ツリー組み立て用） -----
 
-/** 添付ファイルを land_id ごとにまとめて返す（土地の登記簿のみ。公図は土地に付かない）。 */
+/** 添付ファイルを land_id ごとにまとめて返す（登記簿・公図の両方。画面側で kind ごとに分ける）。 */
 export async function fetchDocumentsByLand(
   db: SqlLike,
   landIds?: string[],
@@ -104,12 +104,12 @@ export async function fetchDocumentsByLand(
   const rows = landIds
     ? await db.unsafe<(DocumentRow & { land_id: string })[]>(
         `SELECT land_id, ${META_COLUMNS} FROM registry_documents
-          WHERE land_id = ANY($1) AND kind = 'registry' ORDER BY land_id, created_at, id`,
+          WHERE land_id = ANY($1) ORDER BY land_id, created_at, id`,
         [landIds] as never[],
       )
     : await db.unsafe<(DocumentRow & { land_id: string })[]>(
         `SELECT land_id, ${META_COLUMNS} FROM registry_documents
-          WHERE land_id IS NOT NULL AND kind = 'registry' ORDER BY land_id, created_at, id`,
+          WHERE land_id IS NOT NULL ORDER BY land_id, created_at, id`,
       );
   const byLand = new Map<string, RegistryDocument[]>();
   for (const row of rows) {
@@ -213,7 +213,7 @@ async function assertScope(db: SqlLike, scope: DocumentScope): Promise<void> {
 
 // ----- 書き込み -----
 
-/** 添付ファイルを追加する（kind 既定は登記簿。公図は建物・案件にのみ、案件には公図のみ添付できる）。 */
+/** 添付ファイルを追加する（kind 既定は登記簿。案件には下地の公図のみ添付できる）。 */
 export async function addDocument(
   scope: DocumentScope,
   file: UploadedFile,
@@ -223,9 +223,6 @@ export async function addDocument(
   await ensureDbReady();
   assertUploadable(file, scope);
   if (!scope.landId) kind = "kouzu"; // 案件に添付できるのは下地の公図だけ
-  if (kind === "kouzu" && scope.landId && !scope.buildingId) {
-    throw new ApiError(400, "公図は建物か案件にのみ添付できます");
-  }
   const owner = ownerOf(scope);
 
   return sql.begin(async (tx) => {

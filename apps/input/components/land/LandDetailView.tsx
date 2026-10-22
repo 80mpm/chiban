@@ -153,6 +153,14 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
         documents={land.documents}
       />
 
+      <DocumentsCard
+        title="公図（土地）"
+        projectId={proj.id}
+        landId={land.id}
+        kind="kouzu"
+        documents={land.documents}
+      />
+
       <Card
         title={`建物（${buildings.length}）`}
         action={<EditLink href={`${base}/buildings/new`} label="＋ 建物を追加" />}
