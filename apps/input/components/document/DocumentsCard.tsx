@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, SmallButton } from "@/components/Card";
+import { AttachmentSlot } from "@/components/document/AttachmentSlot";
 import {
   uploadDocument,
   replaceDocument,
@@ -16,11 +17,15 @@ import type { DocumentKind, RegistryDocument } from "@chiban/shared/lib/types";
 /** 受け付けるファイル種別（サーバ側の ALLOWED_DOCUMENT_TYPES と対応）。 */
 const ACCEPT = "application/pdf,image/jpeg,image/png";
 
+/** 種別の表示名（空き枠の文言に使う）。 */
+const KIND_LABEL: Record<DocumentKind, string> = { registry: "登記簿", kouzu: "公図" };
+
 /**
  * 登記簿等の添付ファイルのカード（土地・建物共用）。
- * buildingId を渡すと建物の添付になる。kind（既定 registry=登記簿）で種別を選び、
- * documents のうちその種別のものだけを表示・追加する（土地は登記簿と公図の 2 枚、建物は登記簿 1 枚）。保存後は router.refresh() で
- * サーバコンポーネントを読み直す（入力システムはキャッシュを持たない方針）。
+ * buildingId を渡すと建物の添付になる。kind（既定 registry=登記簿）で種別を選ぶ。
+ * 添付は紐づけ先ごと・種類ごとに 1 つまで（サーバで 409）なので、カードは 1 ファイル分の枠として
+ * 「未添付なら空き枠 + 添付ボタン／添付済みならそのファイル + 差し替え・削除」だけを出す。
+ * 保存後は router.refresh() でサーバコンポーネントを読み直す（入力システムはキャッシュを持たない方針）。
  */
 export function DocumentsCard({
   title,
@@ -29,7 +34,6 @@ export function DocumentsCard({
   buildingId,
   kind = "registry",
   documents,
-  maxFiles,
 }: {
   title: string;
   projectId: string;
@@ -37,17 +41,11 @@ export function DocumentsCard({
   buildingId?: string;
   kind?: DocumentKind;
   documents: RegistryDocument[] | undefined;
-  /** 添付できる上限（土地・建物の添付はどれも 1）。上限に達したら「＋ ファイルを添付」を出さない。 */
-  maxFiles?: number;
 }) {
   const router = useRouter();
-  const addInputRef = useRef<HTMLInputElement>(null);
-  const replaceInputRef = useRef<HTMLInputElement>(null);
-  const replaceTargetId = useRef<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const docs = (documents ?? []).filter((d) => d.kind === kind);
-  const full = maxFiles !== undefined && docs.length >= maxFiles;
-  const limitText = maxFiles === 1 ? "1 つまで" : maxFiles !== undefined ? `${maxFiles} ファイルまで` : "";
+  const doc = (documents ?? []).find((d) => d.kind === kind);
   const basePath = documentsPath(projectId, landId, buildingId);
 
   async function run(action: () => Promise<unknown>, successMessage: string) {
@@ -63,109 +61,69 @@ export function DocumentsCard({
     }
   }
 
-  /** input[type=file] から 1 件取り出し、同じファイルを再選択できるよう値を消す。 */
-  function takeFile(input: HTMLInputElement | null): File | null {
-    const file = input?.files?.[0] ?? null;
-    if (input) input.value = "";
-    return file;
-  }
-
   return (
-    <Card
-      title={`${title}（${docs.length}）`}
-      action={
-        full ? undefined : (
-          <SmallButton
-            label="＋ ファイルを添付"
-            disabled={busy}
-            onClick={() => addInputRef.current?.click()}
-          />
-        )
-      }
-    >
+    <Card title={title}>
+      {/* 未添付なら添付、添付済みなら差し替えに使う（ファイル選択は 1 つの input で足りる） */}
       <input
-        ref={addInputRef}
+        ref={inputRef}
         type="file"
         accept={ACCEPT}
         hidden
         onChange={(e) => {
-          const file = takeFile(e.currentTarget);
+          const input = e.currentTarget;
+          const file = input.files?.[0];
+          input.value = ""; // 同じファイルを再選択できるようにする
           if (!file) return;
-          void run(
-            () => uploadDocument(projectId, landId, file, buildingId, kind),
-            "ファイルを添付しました",
-          );
-        }}
-      />
-      <input
-        ref={replaceInputRef}
-        type="file"
-        accept={ACCEPT}
-        hidden
-        onChange={(e) => {
-          const file = takeFile(e.currentTarget);
-          const docId = replaceTargetId.current;
-          replaceTargetId.current = null;
-          if (!file || !docId) return;
-          void run(
-            () => replaceDocument(projectId, landId, docId, file, buildingId),
-            "ファイルを差し替えました",
-          );
+          if (doc) {
+            void run(
+              () => replaceDocument(projectId, landId, doc.id, file, buildingId),
+              "ファイルを差し替えました",
+            );
+          } else {
+            void run(
+              () => uploadDocument(projectId, landId, file, buildingId, kind),
+              "ファイルを添付しました",
+            );
+          }
         }}
       />
 
-      {docs.length === 0 ? (
-        <div className="text-xs text-muted-foreground">
-          添付なし（PDF・JPEG・PNG／1 ファイル 10MB まで{limitText && `・${limitText}`}）
-        </div>
-      ) : (
-        <ul className="space-y-1.5">
-          {docs.map((d) => (
-            <li
-              key={d.id}
-              className="rounded-md border border-border bg-[#f8fafc] px-2.5 py-1.5 text-xs"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <a
-                  href={`${basePath}/${encodeURIComponent(d.id)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="min-w-0 break-all font-medium text-[color:var(--app-brand)] underline-offset-2 hover:underline"
-                >
-                  {d.fileName}
-                </a>
-                <div className="flex shrink-0 gap-1.5">
-                  <SmallButton
-                    label="差し替え"
-                    disabled={busy}
-                    onClick={() => {
-                      replaceTargetId.current = d.id;
-                      replaceInputRef.current?.click();
-                    }}
-                  />
-                  <SmallButton
-                    label="削除"
-                    tone="danger"
-                    disabled={busy}
-                    onClick={() => {
-                      if (!window.confirm(`「${d.fileName}」を削除します。よろしいですか？`)) return;
-                      void run(
-                        () => deleteDocument(projectId, landId, d.id, buildingId),
-                        "添付を削除しました",
-                      );
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="mt-0.5 text-muted-foreground">
-                {fmtBytes(d.byteSize)}
-                {d.uploadedBy && `・${d.uploadedBy}`}
-                {`・${fmtDateTime(d.updatedAt ?? d.createdAt)}`}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <AttachmentSlot
+        doc={doc}
+        href={doc && `${basePath}/${encodeURIComponent(doc.id)}`}
+        emptyText={`${KIND_LABEL[kind]}は未添付です`}
+        hint="PDF・JPEG・PNG／10MB まで"
+        busy={busy}
+        onPick={() => inputRef.current?.click()}
+        meta={
+          doc && (
+            <>
+              {fmtBytes(doc.byteSize)}
+              {doc.uploadedBy && `・${doc.uploadedBy}`}
+              {`・${fmtDateTime(doc.updatedAt ?? doc.createdAt)}`}
+            </>
+          )
+        }
+        actions={
+          doc && (
+            <>
+              <SmallButton label="差し替え" disabled={busy} onClick={() => inputRef.current?.click()} />
+              <SmallButton
+              label="削除"
+              tone="danger"
+              disabled={busy}
+              onClick={() => {
+                if (!window.confirm(`「${doc.fileName}」を削除します。よろしいですか？`)) return;
+                void run(
+                  () => deleteDocument(projectId, landId, doc.id, buildingId),
+                    "添付を削除しました",
+                  );
+                }}
+              />
+            </>
+          )
+        }
+      />
     </Card>
   );
 }

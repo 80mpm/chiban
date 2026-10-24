@@ -189,6 +189,17 @@ CREATE INDEX IF NOT EXISTS idx_registry_documents_project
     ON registry_documents (project_id, created_at, id);
 -- 建物に公図は無い（2026-10 廃止）。かつて建物に添付できた公図の行は消す（冪等。2 回目以降は 0 行）
 DELETE FROM registry_documents WHERE building_id IS NOT NULL AND kind = 'kouzu';
+-- 添付は紐づけ先ごと・種類ごとに 1 つまで（2026-10）。上限導入前に複数付いていた分は
+-- 更新日時が最新の 1 つだけを残して消す（冪等。画面は 1 つしか表示しない）
+DELETE FROM registry_documents WHERE id IN (
+    SELECT id FROM (
+        SELECT id, row_number() OVER (
+            PARTITION BY land_id, building_id, project_id, kind
+            ORDER BY updated_at DESC, created_at DESC, id DESC
+        ) AS rn
+        FROM registry_documents
+    ) ranked WHERE rn > 1
+);
 -- 紐づけ先の制約を「土地か建物の一方」から「土地・建物・案件のいずれか 1 つ」へ差し替える
 DO $$
 BEGIN

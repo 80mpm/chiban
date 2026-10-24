@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, EditLink, SmallButton } from "@/components/Card";
+import { AttachmentSlot } from "@/components/document/AttachmentSlot";
 import {
   deleteProjectKouzu,
   projectKouzuPath,
@@ -18,8 +19,9 @@ const ACCEPT = "image/jpeg,image/png";
 
 /**
  * 案件の公図カード（Issue #44）。筆マスタに無い筆を描くための下地の公図画像を
- * 案件に添付し、地図への位置合わせ・差し替え・削除を行う。公図は 1 案件につき 1 つまでで、
- * 位置合わせは 1 回、同じ公図の上で何筆でも描ける。保存後は router.refresh() でサーバコンポーネントを読み直す。
+ * 案件に添付し、地図への位置合わせ・差し替え・削除を行う。公図は 1 案件につき 1 つまでなので
+ * 1 ファイル分の枠（AttachmentSlot）として見せる。位置合わせは 1 回、同じ公図の上で何筆でも描ける。
+ * 保存後は router.refresh() でサーバコンポーネントを読み直す。
  */
 export function ProjectKouzuCard({
   projectId,
@@ -29,12 +31,9 @@ export function ProjectKouzuCard({
   kouzu: RegistryDocument[];
 }) {
   const router = useRouter();
-  const addInputRef = useRef<HTMLInputElement>(null);
-  const replaceInputRef = useRef<HTMLInputElement>(null);
-  const replaceTargetId = useRef<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const basePath = projectKouzuPath(projectId);
-  const aligned = kouzu.some((d) => d.overlay);
+  const doc = kouzu[0];
 
   async function run(action: () => Promise<unknown>, successMessage: string) {
     setBusy(true);
@@ -49,117 +48,83 @@ export function ProjectKouzuCard({
     }
   }
 
-  /** input[type=file] から 1 件取り出し、同じファイルを再選択できるよう値を消す。 */
-  function takeFile(input: HTMLInputElement | null): File | null {
-    const file = input?.files?.[0] ?? null;
-    if (input) input.value = "";
-    return file;
-  }
-
   return (
     <Card
-      title={`公図（${kouzu.length}）`}
+      title="公図"
       action={
-        <div className="flex gap-1.5">
-          {aligned && (
-            <EditLink href={`/projects/${projectId}/lands/new/draw`} label="公図から筆を描く" />
-          )}
-          {kouzu.length === 0 && (
-            <SmallButton
-              label="＋ 公図を添付"
-              disabled={busy}
-              onClick={() => addInputRef.current?.click()}
-            />
-          )}
-        </div>
+        doc?.overlay && (
+          <EditLink href={`/projects/${projectId}/lands/new/draw`} label="公図から筆を描く" />
+        )
       }
     >
+      {/* 未添付なら添付、添付済みなら差し替えに使う（ファイル選択は 1 つの input で足りる） */}
       <input
-        ref={addInputRef}
+        ref={inputRef}
         type="file"
         accept={ACCEPT}
         hidden
         onChange={(e) => {
-          const file = takeFile(e.currentTarget);
+          const input = e.currentTarget;
+          const file = input.files?.[0];
+          input.value = ""; // 同じファイルを再選択できるようにする
           if (!file) return;
-          void run(() => uploadProjectKouzu(projectId, file), "公図を添付しました（次に位置合わせをしてください）");
-        }}
-      />
-      <input
-        ref={replaceInputRef}
-        type="file"
-        accept={ACCEPT}
-        hidden
-        onChange={(e) => {
-          const file = takeFile(e.currentTarget);
-          const docId = replaceTargetId.current;
-          replaceTargetId.current = null;
-          if (!file || !docId) return;
-          void run(
-            () => replaceProjectKouzu(projectId, docId, file),
-            "公図を差し替えました（位置合わせをやり直してください）",
-          );
+          if (doc) {
+            void run(
+              () => replaceProjectKouzu(projectId, doc.id, file),
+              "公図を差し替えました（位置合わせをやり直してください）",
+            );
+          } else {
+            void run(
+              () => uploadProjectKouzu(projectId, file),
+              "公図を添付しました（次に位置合わせをしてください）",
+            );
+          }
         }}
       />
 
       <p className="mb-2 text-xs text-muted-foreground">
-        筆マスタに無い筆は、ここに添付した公図を地図に位置合わせしてから、その上に描いて追加できます
-        （1 案件 1 つまで・JPEG・PNG／1 ファイル 10MB まで。PDF は画像に変換してください）。
+        筆マスタに無い筆は、ここに添付した公図を地図に位置合わせしてから、その上に描いて追加できます。
       </p>
-      {kouzu.length === 0 ? (
-        <div className="text-xs text-muted-foreground">添付なし</div>
-      ) : (
-        <ul className="space-y-1.5">
-          {kouzu.map((d) => (
-            <li
-              key={d.id}
-              className="rounded-md border border-border bg-[#f8fafc] px-2.5 py-1.5 text-xs"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <a
-                  href={`${basePath}/${encodeURIComponent(d.id)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="min-w-0 break-all font-medium text-[color:var(--app-brand)] underline-offset-2 hover:underline"
-                >
-                  {d.fileName}
-                </a>
-                <div className="flex shrink-0 gap-1.5">
-                  <EditLink
-                    href={`/projects/${projectId}/kouzu/${encodeURIComponent(d.id)}/align`}
-                    label="位置合わせ"
-                  />
-                  <SmallButton
-                    label="差し替え"
-                    disabled={busy}
-                    onClick={() => {
-                      replaceTargetId.current = d.id;
-                      replaceInputRef.current?.click();
-                    }}
-                  />
-                  <SmallButton
-                    label="削除"
-                    tone="danger"
-                    disabled={busy}
-                    onClick={() => {
-                      if (!window.confirm(`公図「${d.fileName}」を削除します。よろしいですか？\n（この公図から描いた筆・土地は消えません）`)) return;
-                      void run(() => deleteProjectKouzu(projectId, d.id), "公図を削除しました");
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="mt-0.5 text-muted-foreground">
-                <span className={d.overlay ? "text-status-acquired" : "text-[#b45309]"}>
-                  {d.overlay ? "位置合わせ済み" : "位置合わせ未設定"}
-                </span>
-                {`・${fmtBytes(d.byteSize)}`}
-                {d.uploadedBy && `・${d.uploadedBy}`}
-                {`・${fmtDateTime(d.updatedAt ?? d.createdAt)}`}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <AttachmentSlot
+        doc={doc}
+        href={doc && `${projectKouzuPath(projectId)}/${encodeURIComponent(doc.id)}`}
+        emptyText="公図は未添付です"
+        hint="JPEG・PNG／10MB まで（PDF は画像に変換してください）"
+        busy={busy}
+        onPick={() => inputRef.current?.click()}
+        meta={
+          doc && (
+            <>
+              <span className={doc.overlay ? "text-status-acquired" : "text-[#b45309]"}>
+                {doc.overlay ? "位置合わせ済み" : "位置合わせ未設定"}
+              </span>
+              {`・${fmtBytes(doc.byteSize)}`}
+              {doc.uploadedBy && `・${doc.uploadedBy}`}
+              {`・${fmtDateTime(doc.updatedAt ?? doc.createdAt)}`}
+            </>
+          )
+        }
+        actions={
+          doc && (
+            <>
+              <EditLink
+                href={`/projects/${projectId}/kouzu/${encodeURIComponent(doc.id)}/align`}
+                label="位置合わせ"
+              />
+              <SmallButton label="差し替え" disabled={busy} onClick={() => inputRef.current?.click()} />
+              <SmallButton
+                label="削除"
+                tone="danger"
+                disabled={busy}
+                onClick={() => {
+                  if (!window.confirm(`公図「${doc.fileName}」を削除します。よろしいですか？\n（この公図から描いた筆・土地は消えません）`)) return;
+                  void run(() => deleteProjectKouzu(projectId, doc.id), "公図を削除しました");
+                }}
+              />
+            </>
+          )
+        }
+      />
     </Card>
   );
 }
