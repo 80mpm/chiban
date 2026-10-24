@@ -4,7 +4,7 @@ import { Providers } from "@chiban/shared/components/Providers";
 
 export const metadata: Metadata = {
   title: "案件入力システム",
-  description: "ファミリーコーポレーション社 事務スタッフ向け 案件入力デモ",
+  description: "ファミリーコーポレーション社 事務スタッフ向け 案件入力システム",
 };
 
 export default function RootLayout({

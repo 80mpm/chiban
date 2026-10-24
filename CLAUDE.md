@@ -194,9 +194,10 @@ ZENRIN Maps API は **ログイン認証方式**（`zip-site.com` 系）を使�
 - ログイン失敗は ID の存在を漏らさない共通文言の 401。停止中・ロール外は 403
 - **デモ用アカウントは `id` / `pass`**（`lib/db/seed-users.ts`）。種別は事務のため
   閲覧システム・入力システムのどちらにもこの 1 つでログインできる。既存 DB にも
-  `ON CONFLICT (login_id) DO NOTHING` で毎回用意するが、パスワードを変更していれば上書きしない
+  `ON CONFLICT (login_id) DO NOTHING` で毎回用意するが、パスワードを変更していれば上書きしない。
+  表示名は「管理者」（旧名「デモ」のままの既存 DB は初期化時に付け替える。別名に変えていれば触らない）
 - パスワードは `lib/auth/password.ts`（crypto.scrypt）。ログイン画面は shared の `LoginForm`
-  （デモ用初期アカウントの案内付き）。Topbar にユーザー名・種別・ログアウトを表示
+  （アカウントの案内や DEMO 表記は出さない）。Topbar にユーザー名・種別・ログアウトを表示
 
 ### データ API 一覧（`app/api/*` の Route Handler）
 
@@ -393,8 +394,8 @@ to the root directory or its dependencies」（npm workspaces の `@chiban/share
 
 ### ヘッダー（トップバー）
 
-全画面共通の `packages/shared/components/Topbar.tsx`。構造は `h1（システム名リンク → 画面名 →
-DEMO バッジ）→ ユーザー名 + ログアウト → サンプルデータに戻す`。システム名は `appName` prop
+全画面共通の `packages/shared/components/Topbar.tsx`。構造は `h1（システム名リンク → 画面名）→
+ユーザー名 + ログアウト → サンプルデータに戻す`（画面上に「デモ」「DEMO」の表記は出さない）。システム名は `appName` prop
 （viewer=「案件管理システム」、input=「案件入力システム」）。
 **モバイル（md 未満）では画面名を省略し、ユーザー操作（ログアウト・リセット）を ⋮ メニューに集約**。
 

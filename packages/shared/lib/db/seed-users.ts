@@ -22,9 +22,12 @@ const INITIAL_PASSWORD = "demo1234";
 const DEMO_USER = {
   loginId: "id",
   password: "pass",
-  name: "デモ",
+  name: "管理者",
   role: "office" as const,
 };
+
+/** かつての表示名。画面に「デモ」と出さないため、既存 DB で未変更ならこの名前から付け替える。 */
+const DEMO_USER_OLD_NAME = "デモ";
 
 const INITIAL_USERS: { loginId: string; name: string; role: "sales" | "office" }[] = [
   { loginId: "honda", name: "本田", role: "sales" },
@@ -48,6 +51,11 @@ export async function seedUsersIfEmpty(sql: Sql): Promise<boolean> {
   if (added.count > 0) {
     console.log(`デモアカウントを用意しました: ${DEMO_USER.loginId} / ${DEMO_USER.password}`);
   }
+  // 既存 DB の表示名を「デモ」→「管理者」へ（ユーザー管理で別名に変えていれば触らない）
+  await sql`
+    UPDATE users SET name = ${DEMO_USER.name}, updated_at = now()
+     WHERE login_id = ${DEMO_USER.loginId} AND name = ${DEMO_USER_OLD_NAME}
+  `;
 
   if (n > 0) return false;
 
