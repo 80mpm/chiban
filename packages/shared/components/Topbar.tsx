@@ -85,11 +85,8 @@ export function Topbar({
         >
           {appName}
         </Link>
-        {/* 画面名は狭幅では省略する（システム名 + DEMO は常に出す） */}
-        <span className="hidden sm:inline"> — {screen}</span>{" "}
-        <span className="ml-2 inline-block rounded-lg bg-badge px-[7px] py-0.5 align-middle text-[10px] font-medium">
-          DEMO
-        </span>
+        {/* 画面名は狭幅では省略する（システム名は常に出す） */}
+        <span className="hidden sm:inline"> — {screen}</span>
       </h1>
 
       {/* PC（md〜）: 従来どおり横並び */}

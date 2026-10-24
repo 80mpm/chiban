@@ -57,9 +57,6 @@ export function LoginForm({ appName }: { appName: string }) {
         >
           <h1 className="text-lg font-bold text-[color:var(--app-text-dark)]">
             {appName}
-            <span className="ml-2 inline-block rounded-lg bg-badge px-[7px] py-0.5 align-middle text-[10px] font-medium text-white">
-              DEMO
-            </span>
           </h1>
           <p className="mb-4 mt-1 text-xs text-muted-foreground">
             ログインIDとパスワードを入力してください
@@ -108,10 +105,6 @@ export function LoginForm({ appName }: { appName: string }) {
             {submitting ? "ログイン中…" : "ログイン"}
           </button>
         </form>
-
-        <p className="mt-3 text-center text-[11px] text-muted-foreground">
-          デモ用アカウント: id / pass（閲覧・入力とも可）
-        </p>
       </div>
     </div>
   );
