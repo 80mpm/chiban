@@ -354,7 +354,7 @@ apps/input/                   # 案件入力システム（事務用・port 3001
 **プレビュー（main 以外のブランチ・PR）はビルドしない**（Preview 環境も本番と同じ DB を指すため、
 未マージのコードが本番 DB にスキーマ変更・データ削除を走らせないように）。片方のアプリだけが
 変わったときの不要ビルドは、Vercel のプロジェクト設定「Skip deployments when there are no changes
-to the root directory or its dependencies」（npm workspaces の `@chiban/shared` 依存を辿る）で省く。
+to the root directory or its dependencies」（npm workspaces の `@chiban/shared` 依存を辿る。両プロジェクトで有効）で省く。
 `.vercelignore` が `.git` と `/tools` を除くため、Ignored Build Step で `git diff` やリポジトリ内の
 スクリプトは使えない点に注意。`regions: ["hnd1"]` も `vercel.json` で固定している。緊急時はローカル CLI（`vercel deploy --prod`）も
 引き続き使える（CLI デプロイには Ignored Build Step は効かない）
