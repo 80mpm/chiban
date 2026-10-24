@@ -6,7 +6,7 @@ import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-/** 土地の編集フォーム（ステータス・面積・概要・地権者・抵当権）。 */
+/** 土地の編集フォーム（ステータス・面積・概要・所有者・抵当権）。 */
 export default async function LandEditPage({
   params,
 }: {

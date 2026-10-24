@@ -84,7 +84,7 @@ function visit(
   return { user, comment, date, directOrTel, meetingType, nextDate, progress, principal };
 }
 
-/** 地権者（付帯情報は省略可。地権者名・住所・抵当権者はすべて架空）。 */
+/** 所有者（付帯情報は省略可。所有者名・住所・抵当権者はすべて架空）。 */
 function owner(
   name: string,
   share = "",
@@ -368,7 +368,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
       status: "acquired",
       updatedAt: t(5),
       visits: [
-        visit("佐藤", "地権者と条件合意。売買契約締結・所有権移転登記完了。", t(5), "直", "面談(対面)", null, "初期見込み", "principal"),
+        visit("佐藤", "所有者と条件合意。売買契約締結・所有権移転登記完了。", t(5), "直", "面談(対面)", null, "初期見込み", "principal"),
       ],
     },
     5: { status: "acquired", updatedAt: t(5) },
@@ -381,7 +381,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
       status: "acquired",
       updatedAt: t(3),
       visits: [
-        visit("佐藤", "地権者と条件合意。売買契約締結・所有権移転登記完了。", t(3), "直", "面談(対面)", null, "初期見込み", "principal"),
+        visit("佐藤", "所有者と条件合意。売買契約締結・所有権移転登記完了。", t(3), "直", "面談(対面)", null, "初期見込み", "principal"),
       ],
     },
     2: {
@@ -418,7 +418,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
     }, uenoOverrides),
     await buildProject(4, "秋葉原", AKIHABARA_CHIBANS, {
       name: "秋葉原計画",
-      description: "秋葉原駅近接の4筆。隣接地権者の意向確認を開始した初期段階の案件",
+      description: "秋葉原駅近接の4筆。隣接地の所有者の意向確認を開始した初期段階の案件",
       address: "東京都台東区秋葉原",
       access: "JR山手線「秋葉原」駅 徒歩4分",
       staff: "本田",

@@ -58,7 +58,7 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 - **案件一覧 (`/`)**: 全案件を地図 + サイドリストで俯瞰するトップページ（編集導線なし・閲覧専用）。
   **モバイル（md 未満）は画面下部のトグルで地図/リストを全画面切替**（PC は 2 カラム）
 - **案件詳細 (`/projects/[id]`)**: 公図風ビュー(左) + 地図(右) の左右半々ビュー。
-  左ペインは土地の polygon から自動生成した公図風 SVG（白地・北上・地番/地権者/坪数ラベル付き）、
+  左ペインは土地の polygon から自動生成した公図風 SVG（白地・北上・地番/所有者/坪数ラベル付き）、
   右ペインは ZENRIN 地図に**案件領域のみ**表示する（筆ポリゴンは地図に重ねない）。
   公図風ビューの筆クリックで右ペインに土地の全項目・訪問記録一覧を全面表示する（**訪問記録の追加もここで行う**。
   閲覧システム唯一の書き込み機能）。
@@ -84,17 +84,17 @@ PR のタイトル・本文を**英語で作成・更新することは禁止**�
 | `/projects/[id]/edit` | 案件情報の編集フォーム（polygon/frontRoads は送らない） |
 | `/projects/[id]/map` | 領域・前面道路の編集（ポリゴン描画 + 前面道路幅員を**ローカル state に溜め「保存」で一括 PATCH**。描画中は保存不可） |
 | `/projects/[id]/lands/new` | 土地追加＝筆選択（町名プルダウン + 公図ビュー。クリック=選択 → ボタンで確定。成功後は新しい土地詳細へ） |
-| `/projects/[id]/lands/[landId]` | 土地詳細（基本情報・地権者・抵当権・**登記簿**・**公図**〔それぞれ 1 土地 1 つまで〕・建物のカード + 各行の編集導線・削除） |
+| `/projects/[id]/lands/[landId]` | 土地詳細（基本情報・所有者・抵当権・**登記簿**・**公図**〔それぞれ 1 土地 1 つまで〕・建物のカード + 各行の編集導線・削除） |
 | `/projects/[id]/lands/[landId]/edit` | 土地編集フォーム（**基本情報のみ**: ステータス/面積/概要。owners/mortgages/buildings キーは送らない） |
 | `/projects/[id]/lands/new/draw` | 土地追加＝**公図から筆を描く**（筆マスタに無い筆用。位置合わせ済みの案件の公図を下地に Leaflet.draw で領域を描き、町名プルダウン + 地番入力で保存。Issue #44） |
 | `/projects/[id]/kouzu/[docId]/align` | 案件の公図の位置合わせ（公図画像を地図に半透明で重ね、中心ハンドル=移動・右上隅ハンドル=拡大縮小と回転、数値入力も可。「保存」で PATCH） |
 | `/projects/[id]/lands/[landId]/parcel` | 筆の変更（筆選択ページの change モード） |
-| `/projects/[id]/lands/[landId]/owners/new`・`owners/[n]/edit` | 土地の地権者を 1 人ずつ追加・編集・削除（`[n]` は並び順 1 始まり。行に ID が無いため） |
+| `/projects/[id]/lands/[landId]/owners/new`・`owners/[n]/edit` | 土地の所有者を 1 人ずつ追加・編集・削除（`[n]` は並び順 1 始まり。行に ID が無いため） |
 | `/projects/[id]/lands/[landId]/mortgages/new`・`mortgages/[n]/edit` | 土地の抵当権を 1 件ずつ追加・編集・削除 |
 | `/projects/[id]/lands/[landId]/buildings/new` | 建物追加フォーム（基本情報のみ。作成後は新建物の詳細へ） |
-| `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の地権者・抵当権・**登記簿**カード〔1 建物 1 つまで〕 + 削除） |
+| `/projects/[id]/lands/[landId]/buildings/[buildingId]` | 建物詳細ハブ（基本情報・建物の所有者・抵当権・**登記簿**カード〔1 建物 1 つまで〕 + 削除） |
 | `/projects/[id]/lands/[landId]/buildings/[buildingId]/edit` | 建物の基本情報の編集フォーム |
-| `.../buildings/[buildingId]/owners/...`・`mortgages/...` | 建物の地権者・抵当権の行単位ページ（土地側と同型） |
+| `.../buildings/[buildingId]/owners/...`・`mortgages/...` | 建物の所有者・抵当権の行単位ページ（土地側と同型） |
 | `/users` | ユーザー管理（一覧。種別フィルタタブ「すべて/営業/事務」= Issue #22/#23。案件一覧ヘッダから遷移） |
 | `/users/new` | ユーザー登録（ログインID・氏名・種別・初期パスワード） |
 | `/users/[userId]/edit` | ユーザー編集（ログインID〔重複不可〕・氏名・種別）+ 停止/再開ボタン |
@@ -304,12 +304,12 @@ apps/input/                   # 案件入力システム（事務用・port 3001
     projects/[id]/lands/[landId]/page.tsx      # 土地詳細
     projects/[id]/lands/[landId]/edit/page.tsx # 土地編集フォーム（基本情報のみ）
     projects/[id]/lands/[landId]/parcel/page.tsx  # 筆の変更
-    projects/[id]/lands/[landId]/owners/{new,[ownerIndex]/edit}/page.tsx      # 土地の地権者（行単位）
+    projects/[id]/lands/[landId]/owners/{new,[ownerIndex]/edit}/page.tsx      # 土地の所有者（行単位）
     projects/[id]/lands/[landId]/mortgages/{new,[mortgageIndex]/edit}/page.tsx # 土地の抵当権（行単位）
     projects/[id]/lands/[landId]/buildings/new/page.tsx          # 建物追加（基本情報のみ）
     projects/[id]/lands/[landId]/buildings/[buildingId]/page.tsx # 建物詳細ハブ（削除もここ）
     projects/[id]/lands/[landId]/buildings/[buildingId]/edit/page.tsx  # 建物の基本情報編集
-    projects/[id]/lands/[landId]/buildings/[buildingId]/{owners,mortgages}/...  # 建物の地権者・抵当権（行単位）
+    projects/[id]/lands/[landId]/buildings/[buildingId]/{owners,mortgages}/...  # 建物の所有者・抵当権（行単位）
     api/                      # projects(GET+POST) / projects/[id](PATCH/DELETE) / lands CRUD /
                               # parcel-towns / parcels / reset / youto-wms /
                               # lands/[landId]/documents(+[docId]) と buildings/[buildingId]/documents(+[docId])
@@ -329,7 +329,7 @@ apps/input/                   # 案件入力システム（事務用・port 3001
     document/DocumentsCard.tsx                   # 登記簿等の添付カード（土地・建物共用。kind で登記簿/公図を切替。添付/差し替え/削除）
     document/AttachmentSlot.tsx                  # 添付 1 ファイル分の枠（空き枠 or ファイル 1 件。DocumentsCard・ProjectKouzuCard で共用）
     Card.tsx                                     # カード外枠 + EditLink/SmallButton（土地・建物・登記簿で共用）
-    owner/OwnerForm.tsx                          # 地権者 1 人のフォーム（土地/建物共用・削除もここ）
+    owner/OwnerForm.tsx                          # 所有者 1 人のフォーム（土地/建物共用・削除もここ）
     mortgage/MortgageForm.tsx                    # 抵当権 1 件のフォーム（土地/建物共用・削除もここ）
     project/FrontRoadEditor.tsx                  # 前面道路幅員の一覧編集（ローカル onChange）
     building/{BuildingForm,BuildingDetailView}.tsx
@@ -411,7 +411,7 @@ DEMO バッジ）→ ユーザー名 + ログアウト → サンプルデータ
   追加済みの筆は候補から除外され、重複時はサーバの 409 がフォーム上部バナーに出る。
   筆が見つからないときは同ページ下の「公図から描く」へ（案件の公図を下地に描画。手動の筆は
   案件詳細の土地一覧に「公図」印、土地詳細に「筆の出所」として表示）
-- 地権者・抵当権は 1 行 = 1 ページで追加・編集・削除する（`owners/new`・`owners/[n]/edit` 等）。
+- 所有者・抵当権は 1 行 = 1 ページで追加・編集・削除する（`owners/new`・`owners/[n]/edit` 等）。
   行に ID が無いため URL は並び順（1 始まり）。範囲外は 404。保存は配列再構築の全置換 PATCH
 
 **案件詳細（viewer）** / **登記所備付地図ビューア** は「案件概要」記載のとおり。
@@ -452,7 +452,7 @@ DEMO バッジ）→ ユーザー名 + ログアウト → サンプルデータ
   と突き合わせる。版が違えば既存 DB の `parcels.geometry` だけを
   `(chibankuiki_id, chiban)` をキーに更新する（`refreshParcelGeometryIfStale`）。
   `parcels.id` は `lands.parcel_id` から参照されているため作り直さない
-- 所有者（地権者）情報は登記所備付地図データに含まれないため、サンプルの地権者名はすべて架空
+- 所有者情報は登記所備付地図データに含まれないため、サンプルの所有者名はすべて架空
 
 ### ポリゴンの頂点数は UI に出さない
 
@@ -511,7 +511,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
   マスタからの導出値（API が読み出しのたびに parcels・chibankuiki から再導出。lands には保存しない）
 - `owners[{name, share}]` は `land_owners` テーブルに正規化（share は `'分子/分母'` 文字列、持分なしは `''`）。
   API は読み出し時に追加順で集約して返し、更新時は土地ごとに全置換する
-- `Building.residentOwnerMatch` は居住者と所有者（建物の地権者）の一致を 3 値で持つ
+- `Building.residentOwnerMatch` は居住者と建物の所有者の一致を 3 値で持つ
   （`match`=一致 / `mismatch`=不一致 / `unknown`=未確認。既存・未送信は `unknown`）。表示ラベルと色は
   `lib/format.ts` の `RESIDENT_OWNER_MATCH_DEFS`。入力システムの建物フォームで設定し、建物詳細ハブと
   閲覧システムの土地詳細（建物情報）に表示する（閲覧は表示のみ）
@@ -529,9 +529,9 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `chibankuiki` | id (IDENTITY PK), shikuchoson_id (FK), choaza_code, name, lat, lng | 地番区域（大字町丁目）マスタ。`UNIQUE (shikuchoson_id, choaza_code)`・`UNIQUE (shikuchoson_id, name)`。`13106_2025.csv` から投入 |
 | `parcels` | id (IDENTITY PK), chibankuiki_id (FK), chiban, geometry (jsonb), source ('master'/'manual') | 筆マスタ。`kouzu_parcels_seed.json.gz`（なければ `kouzu_xml_data.js`）から COPY で投入。`UNIQUE (chibankuiki_id, chiban)`。`source = 'manual'` は案件の公図から描いて手動登録した筆（2026-10 追加列・既定 `'master'`。Issue #44） |
 | `projects` | id (IDENTITY), name, description, polygon (jsonb), address, access, current_far, target_far, front_roads (jsonb), created_at, updated_at | 案件。API では id を文字列で返す |
-| `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_m2, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)`。地権者は `land_owners`、抵当権は `land_mortgages` に正規化 |
+| `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_m2, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)`。所有者は `land_owners`、抵当権は `land_mortgages` に正規化 |
 | `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
-| `buildings` | id (`id_xxxx`), land_id (FK), location, kaoku_number, structure, usage, floor_area, built_date, description, resident_owner_match, created_at, updated_at | 建物（土地の子）。`resident_owner_match` は `CHECK` で `'match'/'mismatch'/'unknown'` に限定（既定 `'unknown'`。既存 DB には `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` で追随）。地権者は `building_owners`、抵当権は `building_mortgages` に正規化 |
+| `buildings` | id (`id_xxxx`), land_id (FK), location, kaoku_number, structure, usage, floor_area, built_date, description, resident_owner_match, created_at, updated_at | 建物（土地の子）。`resident_owner_match` は `CHECK` で `'match'/'mismatch'/'unknown'` に限定（既定 `'unknown'`。既存 DB には `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` で追随）。所有者は `building_owners`、抵当権は `building_mortgages` に正規化 |
 | `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), project_id (FK・nullable), kind ('registry'/'kouzu'), overlay (jsonb), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK (num_nonnulls(land_id, building_id, project_id) = 1)` で土地・建物・案件のいずれか 1 つにだけ紐づくことを担保（2026-10 に旧制約 `registry_documents_owner_one` を `DO` ブロックで差し替え）。案件に紐づくのは筆を描く下地の公図（JPEG/PNG のみ）で、`overlay` に地図上の位置合わせ `{center, metersPerPixel, rotationDeg, opacity, imageWidth, imageHeight}` を持つ（画像の差し替えで NULL に戻る。Issue #44）。`kind` は種別（既定 `'registry'` = 登記簿・`'kouzu'` = 公図。2026-10 に `ADD COLUMN IF NOT EXISTS` で追加し既存行は登記簿扱い）。公図は土地・案件に添付でき、土地の読み出しは登記簿・公図の両方を返す（画面側で kind ごとにカードを分ける）。建物は登記簿のみ。**どの添付も紐づけ先ごと・種類ごとに 1 つまで**（案件の公図・土地の登記簿・土地の公図・建物の登記簿。`addDocument` が紐づけ先の行を `FOR UPDATE` でロックしてから数え、2 つ目は 409 で差し替えへ誘導）。かつて建物に添付できた公図（Issue #42）は廃止し、スキーマ初期化時に `DELETE` で消す（冪等）。上限導入前に複数付いていた添付は、スキーマ初期化時に紐づけ先・種類ごとに更新日時が最新の 1 つだけを残して `DELETE` する（冪等）。画面も添付を 1 ファイル分の枠（`AttachmentSlot`。未添付=点線の空き枠 + 添付ボタン／添付済み=ファイル 1 件 + 差し替え・削除）として見せ、件数表示や追加ボタンは持たない。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
 | `users` | id (uuid PK), login_id (UNIQUE), name, role ('sales'/'office'), password_hash, is_active | 両システム共用アカウント。password_hash は scrypt（`lib/auth/password.ts`）で API に返さない。デモアカウント **`id` / `pass`**（種別=事務なので閲覧・入力の両方に入れる）は既存 DB にも毎回冪等に用意する。氏名入りの初期アカウント（honda=営業・パスワード `demo1234`）は users が空のときだけ投入（kimura・sato は廃止）。**`POST /api/reset` では消えない** |

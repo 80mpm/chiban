@@ -6,7 +6,7 @@ import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-/** 建物の地権者の編集・削除（[ownerIndex] は並び順 1 始まり）。 */
+/** 建物の所有者の編集・削除（[ownerIndex] は並び順 1 始まり）。 */
 export default async function BuildingOwnerEditPage({
   params,
 }: {
@@ -30,7 +30,7 @@ export default async function BuildingOwnerEditPage({
   }
   return (
     <div className="grid h-screen grid-rows-[56px_1fr]">
-      <Topbar user={user} appName="案件入力システム" screen="建物の地権者の編集" />
+      <Topbar user={user} appName="案件入力システム" screen="建物の所有者の編集" />
       <div className="min-h-0 overflow-y-auto bg-[color:var(--app-bg)]">
         <OwnerForm proj={proj} land={land} building={building} index={n} />
       </div>

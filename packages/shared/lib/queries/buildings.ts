@@ -1,6 +1,6 @@
 // ============================================================
 // 建物クエリ（owners.ts / visits.ts に倣う）。
-// 建物は土地の子。地権者は building_owners に正規化し、土地の PATCH に
+// 建物は土地の子。所有者は building_owners に正規化し、土地の PATCH に
 // buildings を畳み込む形で全置換する（独立 API は持たない）。
 // ============================================================
 
@@ -65,7 +65,7 @@ export async function fetchBuildingsByLand(
  * かつては DELETE + INSERT の全置換だったが、それでは
  * ①建物に紐づく登記簿（registry_documents）が ON DELETE CASCADE で消え、
  * ②created_at が編集のたびに現在時刻へ戻ってしまうため、UPSERT に変更した。
- * 各建物ごとに建物地権者（building_owners）・抵当権は従来どおり全置換する。
+ * 各建物ごとに建物所有者（building_owners）・抵当権は従来どおり全置換する。
  */
 export async function replaceBuildings(
   sql: SqlLike,

@@ -22,7 +22,7 @@ const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "�
 
 /**
  * 建物の基本情報の作成/編集フォーム（所在・家屋番号・構造・種類・延床面積・
- * 新築年月日・居住者と所有者の一致・備考のみ）。地権者・抵当権は建物詳細ページの行単位ページで編集する。
+ * 新築年月日・居住者と所有者の一致・備考のみ）。所有者・抵当権は建物詳細ページの行単位ページで編集する。
  *
  * API は建物単体のエンドポイントを持たないため、土地の buildings 配列を再構築して
  * PATCH {buildings} で全置換する（既存建物は id ごと再送されるため id は安定）。
@@ -81,7 +81,7 @@ export function BuildingForm({
       builtDate,
       description: description.trim(),
       residentOwnerMatch,
-      // 追加時は空、編集時は既存の地権者・抵当権を維持して再送する
+      // 追加時は空、編集時は既存の所有者・抵当権を維持して再送する
       owners: building?.owners ?? [],
       mortgages: building?.mortgages ?? [],
       createdAt: building?.createdAt ?? null,
@@ -224,7 +224,7 @@ export function BuildingForm({
 
       {isCreate && (
         <p className="mt-3 text-xs text-muted-foreground">
-          建物の地権者・抵当権は、追加後の建物詳細ページから入力できます。
+          建物の所有者・抵当権は、追加後の建物詳細ページから入力できます。
         </p>
       )}
     </main>
