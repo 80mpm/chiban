@@ -350,11 +350,13 @@ apps/input/                   # 案件入力システム（事務用・port 3001
 環境変数で動く。初回アクセス時の `ensureDbReady()` でスキーマ作成・シード投入が走る
 （COPY による筆マスタ投入は Node ランタイムが必要なため、該当 Route Handler は `runtime = 'nodejs'`）。
 **デプロイは GitHub 連携（`80mpm/chiban` の `main` へのマージ／push で両プロジェクトが本番デプロイ）**。
-各アプリの `vercel.json` が `ignoreCommand` で `tools/vercel-ignore-build.sh` を呼び、
-①**プレビュー（main 以外のブランチ・PR）はビルドしない**（Preview 環境も本番と同じ DB を指すため、
-未マージのコードが本番 DB にスキーマ変更・データ削除を走らせないように）
-②本番でも前回の本番デプロイから自アプリ・`packages/`・ルートの依存定義が変わっていなければビルドしない。
-`regions: ["hnd1"]` も `vercel.json` で固定している。緊急時はローカル CLI（`vercel deploy --prod`）も
+各アプリの `vercel.json` の `ignoreCommand` で
+**プレビュー（main 以外のブランチ・PR）はビルドしない**（Preview 環境も本番と同じ DB を指すため、
+未マージのコードが本番 DB にスキーマ変更・データ削除を走らせないように）。片方のアプリだけが
+変わったときの不要ビルドは、Vercel のプロジェクト設定「Skip deployments when there are no changes
+to the root directory or its dependencies」（npm workspaces の `@chiban/shared` 依存を辿る）で省く。
+`.vercelignore` が `.git` と `/tools` を除くため、Ignored Build Step で `git diff` やリポジトリ内の
+スクリプトは使えない点に注意。`regions: ["hnd1"]` も `vercel.json` で固定している。緊急時はローカル CLI（`vercel deploy --prod`）も
 引き続き使える（CLI デプロイには Ignored Build Step は効かない）
 
 **Vercel ダッシュボードで設定する環境変数**（両プロジェクト共通）:
