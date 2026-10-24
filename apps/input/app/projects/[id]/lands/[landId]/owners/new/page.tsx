@@ -6,7 +6,7 @@ import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-/** 土地の地権者を追加。 */
+/** 土地の所有者を追加。 */
 export default async function LandOwnerNewPage({
   params,
 }: {
@@ -19,7 +19,7 @@ export default async function LandOwnerNewPage({
   if (!proj || !land) notFound();
   return (
     <div className="grid h-screen grid-rows-[56px_1fr]">
-      <Topbar user={user} appName="案件入力システム" screen="地権者を追加" />
+      <Topbar user={user} appName="案件入力システム" screen="所有者を追加" />
       <div className="min-h-0 overflow-y-auto bg-[color:var(--app-bg)]">
         <OwnerForm proj={proj} land={land} />
       </div>

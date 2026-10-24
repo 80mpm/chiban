@@ -160,7 +160,7 @@ export function ProjectDetailView({
                     <th className="px-2 py-1.5 font-medium">地番</th>
                     <th className="px-2 py-1.5 font-medium">状態</th>
                     <th className="px-2 py-1.5 text-right font-medium">坪数</th>
-                    <th className="px-2 py-1.5 font-medium">地権者</th>
+                    <th className="px-2 py-1.5 font-medium">所有者</th>
                     <th className="px-2 py-1.5 text-right font-medium">建物</th>
                   </tr>
                 </thead>

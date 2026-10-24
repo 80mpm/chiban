@@ -13,7 +13,7 @@ export const STATUS_DEFS: Record<LandStatus, { label: string; color: string }> =
 
 export const STATUS_KEYS: LandStatus[] = ["target", "acquired"];
 
-/** 居住者と所有者（建物の地権者）の一致の表示定義。 */
+/** 居住者と建物の所有者の一致の表示定義。 */
 export const RESIDENT_OWNER_MATCH_DEFS: Record<ResidentOwnerMatch, { label: string; color: string }> = {
   match: { label: "一致", color: "#10b981" },
   mismatch: { label: "不一致", color: "#f59e0b" },
@@ -42,7 +42,7 @@ export function formatOwners(owners: Owner[] | undefined | null): string {
     .join("・");
 }
 
-/** 空の地権者（行編集 UI の新規行テンプレート）。 */
+/** 空の所有者（行編集 UI の新規行テンプレート）。 */
 export function emptyOwner(): Owner {
   return { name: "", share: "", address: "", regDate: "", regCause: "", description: "" };
 }

@@ -29,7 +29,7 @@ const PRINCIPAL_LABELS: Record<string, string> = {
 };
 const dash = (s: string) => s || "—";
 
-/** 地権者の表示（氏名・持分 + 住所・登記原因の 2 行構成）。 */
+/** 所有者の表示（氏名・持分 + 住所・登記原因の 2 行構成）。 */
 function OwnerList({ owners }: { owners: Owner[] | undefined }) {
   if (!owners || owners.length === 0) return <div>—</div>;
   return (
@@ -205,7 +205,7 @@ export function ProjectDetailClient({
                   {(STATUS_DEFS[selectedLand.status] ?? STATUS_DEFS.target).label}
                 </span>
               </div>
-              <div className="text-[11px] text-[#64748b]">土地の地権者</div>
+              <div className="text-[11px] text-[#64748b]">土地の所有者</div>
               <OwnerList owners={selectedLand.owners} />
               <div className="text-[11px] text-[#64748b]">抵当権</div>
               <MortgageList mortgages={selectedLand.mortgages} />
@@ -246,7 +246,7 @@ export function ProjectDetailClient({
                     )}
                     <ResidentOwnerMatchLine value={b.residentOwnerMatch} />
                     <div className="mt-1 text-[11px]">
-                      <div className="text-[#64748b]">建物の地権者：</div>
+                      <div className="text-[#64748b]">建物の所有者：</div>
                       <OwnerList owners={b.owners} />
                     </div>
                     {(b.mortgages ?? []).length > 0 && (

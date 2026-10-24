@@ -47,7 +47,7 @@ export function KouzuView({
   emptyText?: string;
   className?: string;
   interactive?: boolean;
-  /** 土地ラベル: full=地番/地権者/坪数, chiban=地番のみ, none=なし。筆選択モーダルは chiban。 */
+  /** 土地ラベル: full=地番/所有者/坪数, chiban=地番のみ, none=なし。筆選択モーダルは chiban。 */
   labelMode?: "full" | "chiban" | "none";
   /** 候補筆にも地番を描くか（筆選択モーダルで筆を識別するため）。 */
   showCandidateChiban?: boolean;
@@ -245,7 +245,7 @@ export function KouzuView({
         const ownerLines = (land.owners ?? [])
           .map((o) => (o?.name ? (o.share ? `${o.name}（${o.share}）` : o.name) : ""))
           .filter(Boolean);
-        // labelMode: full=地番+地権者+坪数 / chiban=地番のみ / none=なし
+        // labelMode: full=地番+所有者+坪数 / chiban=地番のみ / none=なし
         const lines =
           labelMode === "chiban"
             ? [land.chiban || "—"]

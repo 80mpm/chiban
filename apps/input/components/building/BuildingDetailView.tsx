@@ -12,7 +12,7 @@ import type { Project, Land, Building } from "@chiban/shared/lib/types";
 const dash = (s: string | null | undefined) => (s ? s : "—");
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
 
-/** 建物詳細（読み取り専用ハブ）。基本情報・建物の地権者・抵当権の各編集ページへの導線を持つ。 */
+/** 建物詳細（読み取り専用ハブ）。基本情報・建物の所有者・抵当権の各編集ページへの導線を持つ。 */
 export function BuildingDetailView({
   proj,
   land,
@@ -69,8 +69,8 @@ export function BuildingDetailView({
       </Card>
 
       <Card
-        title={`建物の地権者（${(building.owners ?? []).length}）`}
-        action={<EditLink href={`${base}/owners/new`} label="＋ 地権者を追加" />}
+        title={`建物の所有者（${(building.owners ?? []).length}）`}
+        action={<EditLink href={`${base}/owners/new`} label="＋ 所有者を追加" />}
       >
         <OwnersList owners={building.owners} editHrefFor={(n) => `${base}/owners/${n}/edit`} />
       </Card>

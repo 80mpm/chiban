@@ -1,5 +1,5 @@
 // ============================================================
-// 地権者ヘルパー（db.py の _parse_share / _replace_owners の移植）
+// 所有者ヘルパー（db.py の _parse_share / _replace_owners の移植）
 // land_owners テーブルへの全置換と持分文字列の分解。
 // サンプル生成・土地 CRUD の双方から使う。
 // ============================================================
@@ -32,7 +32,7 @@ export function dateOrNull(s: string | undefined | null): string | null {
 }
 
 /**
- * 地権者を [{name, share, address, regDate, regCause, description}] に集約する
+ * 所有者を [{name, share, address, regDate, regCause, description}] に集約する
  * 相関サブクエリ（id 順 = 追加順）。LAND_SELECT / BUILDING_SELECT に埋め込む。
  * パラメータを持たない文字列断片なので呼び出し側の sql.unsafe 内でのみ使う。
  */
@@ -53,7 +53,7 @@ export function ownersSelect(table: string, fkCol: string, parentAlias: string):
 }
 
 /**
- * 地権者テーブルを全置換する（DELETE 旧 + INSERT 新）。name 空は捨てる。
+ * 所有者テーブルを全置換する（DELETE 旧 + INSERT 新）。name 空は捨てる。
  * 土地(land_owners/land_id)・建物(building_owners/building_id)の双方から使う汎用版。
  */
 export async function replaceOwnersInto(
@@ -78,7 +78,7 @@ export async function replaceOwnersInto(
   }
 }
 
-/** 土地の地権者を全置換する。 */
+/** 土地の所有者を全置換する。 */
 export function replaceOwners(
   sql: SqlLike,
   landId: string,

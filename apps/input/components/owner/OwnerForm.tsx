@@ -15,7 +15,7 @@ import type { Project, Land, Building, Owner } from "@chiban/shared/lib/types";
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
 
 /**
- * 地権者 1 人の追加・編集・削除フォーム（土地の地権者 / 建物の地権者で共用）。
+ * 所有者 1 人の追加・編集・削除フォーム（土地の所有者 / 建物の所有者で共用）。
  *
  * API は行単位のエンドポイントを持たないため、owners 配列を再構築して
  * PATCH で全置換する（建物の場合は該当建物を差し替えた buildings 配列を送る。
@@ -43,7 +43,7 @@ export function OwnerForm({
 
   const landBase = `/projects/${proj.id}/lands/${land.id}`;
   const backHref = building ? `${landBase}/buildings/${encodeURIComponent(building.id)}` : landBase;
-  const subject = building ? "建物の地権者" : "土地の地権者";
+  const subject = building ? "建物の所有者" : "土地の所有者";
   const title = isCreate ? `${subject}を追加` : `${subject}の編集（${initial.name || `${index} 人目`}）`;
 
   /** 再構築した owners 配列を PATCH の fields に変換する。 */
@@ -169,9 +169,9 @@ export function OwnerForm({
       {!isCreate && (
         <div className="mt-4 flex justify-end">
           <ConfirmDeleteButton
-            label="この地権者を削除"
-            confirmMessage={`地権者「${initial.name}」を削除します。よろしいですか？`}
-            successMessage="地権者を削除しました"
+            label="この所有者を削除"
+            confirmMessage={`所有者「${initial.name}」を削除します。よろしいですか？`}
+            successMessage="所有者を削除しました"
             redirectTo={backHref}
             onDelete={() =>
               updateLand(

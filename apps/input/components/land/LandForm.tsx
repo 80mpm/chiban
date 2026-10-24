@@ -23,7 +23,7 @@ const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "�
 
 /**
  * 土地の基本情報の編集フォーム（ステータス・面積・概要のみ）。
- * 地権者・抵当権・建物はそれぞれの行単位ページで編集する
+ * 所有者・抵当権・建物はそれぞれの行単位ページで編集する
  * （このフォームは owners / mortgages / buildings キーを送らない）。
  */
 export function LandForm({ proj, land }: { proj: Project; land: Land }) {

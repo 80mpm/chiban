@@ -6,7 +6,7 @@ import { requireAppUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-/** 建物詳細（読み取り専用）。基本情報・地権者・抵当権の編集導線と削除を持つ。 */
+/** 建物詳細（読み取り専用）。基本情報・所有者・抵当権の編集導線と削除を持つ。 */
 export default async function BuildingDetailPage({
   params,
 }: {

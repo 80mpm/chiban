@@ -20,7 +20,7 @@ const dash = (s: string | null | undefined) => (s ? s : "—");
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
 
 /**
- * 地権者の一覧（土地・建物共通）。editHrefFor を渡すと行ごとに
+ * 所有者の一覧（土地・建物共通）。editHrefFor を渡すと行ごとに
  * 「編集」リンク（行単位の編集ページ）を出す。
  */
 export function OwnersList({
@@ -31,7 +31,7 @@ export function OwnersList({
   editHrefFor?: (index: number) => string;
 }) {
   if (!owners || owners.length === 0) {
-    return <div className="text-xs text-muted-foreground">地権者が未設定です</div>;
+    return <div className="text-xs text-muted-foreground">所有者が未設定です</div>;
   }
   return (
     <div className="space-y-1.5">
@@ -133,8 +133,8 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
       </Card>
 
       <Card
-        title={`土地の地権者（${(land.owners ?? []).length}）`}
-        action={<EditLink href={`${base}/owners/new`} label="＋ 地権者を追加" />}
+        title={`土地の所有者（${(land.owners ?? []).length}）`}
+        action={<EditLink href={`${base}/owners/new`} label="＋ 所有者を追加" />}
       >
         <OwnersList owners={land.owners} editHrefFor={(n) => `${base}/owners/${n}/edit`} />
       </Card>
@@ -184,7 +184,7 @@ export function LandDetailView({ proj, land }: { proj: Project; land: Land }) {
                   <div className="mt-0.5 text-[11px] text-muted-foreground">{formatBuilding(b)}</div>
                 )}
                 <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  地権者 {(b.owners ?? []).length} 名・抵当権 {(b.mortgages ?? []).length} 件
+                  所有者 {(b.owners ?? []).length} 名・抵当権 {(b.mortgages ?? []).length} 件
                   （編集は「詳細」から）
                 </div>
               </div>

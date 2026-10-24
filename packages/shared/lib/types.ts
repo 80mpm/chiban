@@ -9,10 +9,10 @@ export type LatLng = [number, number];
 /** ステータス（target=対象 / acquired=取得済）。 */
 export type LandStatus = "target" | "acquired";
 
-/** 居住者と所有者（建物の地権者）の一致（match=一致 / mismatch=不一致 / unknown=未確認）。 */
+/** 居住者と建物の所有者の一致（match=一致 / mismatch=不一致 / unknown=未確認）。 */
 export type ResidentOwnerMatch = "match" | "mismatch" | "unknown";
 
-/** 地権者。share は「分子/分母」文字列、持分なしは空文字。 */
+/** 所有者。share は「分子/分母」文字列、持分なしは空文字。 */
 export interface Owner {
   name: string;
   share: string;
@@ -85,7 +85,7 @@ export interface ManualParcelInput {
   polygon: LatLng[];
 }
 
-/** 建物。土地とは別に登記され、地権者も土地と異なりうる（借地上建物など）。 */
+/** 建物。土地とは別に登記され、所有者も土地と異なりうる（借地上建物など）。 */
 export interface Building {
   id: string;
   /** 所在（登記上の所在。例「西浅草二丁目24番地3」）。 */
@@ -102,9 +102,9 @@ export interface Building {
   builtDate: string;
   /** 備考。 */
   description: string;
-  /** 居住者と所有者（建物の地権者）が一致しているか。既定は未確認。 */
+  /** 居住者と建物の所有者が一致しているか。既定は未確認。 */
   residentOwnerMatch: ResidentOwnerMatch;
-  /** 建物の地権者。 */
+  /** 建物の所有者。 */
   owners: Owner[];
   /** 抵当権。 */
   mortgages: Mortgage[];
