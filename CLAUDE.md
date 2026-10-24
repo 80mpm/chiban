@@ -257,7 +257,7 @@ packages/shared/              # @chiban/shared — ビルドしない TS ソー�
   data/
     13106_2025.csv            # 住所マスタシード（Shift-JIS・108町字）。lib/db/seed-address.ts が読む
     kouzu_xml_data.js         # 筆マスタシードのフォールバック（gz が無い場合）兼 public JSON の生成元
-    kouzu_parcels_seed.json.gz  # 筆マスタシード（全144図面・約5.1万筆。自動生成・git 管理外）
+    kouzu_parcels_seed.json.gz  # 筆マスタシード（全144図面・約5.1万筆。自動生成だが git 管理する＝git 連携デプロイに同梱するため）
   styles/shared.css           # Tailwind v4 @theme トークン + 公図/地図ラベルのスタイル（各アプリの globals.css が @import）
   lib/
     db/{client,schema,init,seed-address,seed-parcels,sample,ids,data-files}.ts  # PostgreSQL データレイヤー
@@ -349,7 +349,15 @@ apps/input/                   # 案件入力システム（事務用・port 3001
 **必ず同一 DB** を指すこと。zenrin_session 共有の前提）。タイルプロキシも ZENRIN 認証情報の
 環境変数で動く。初回アクセス時の `ensureDbReady()` でスキーマ作成・シード投入が走る
 （COPY による筆マスタ投入は Node ランタイムが必要なため、該当 Route Handler は `runtime = 'nodejs'`）。
-デプロイはローカル CLI（`vercel deploy --prod`。git 連携なし）。
+**デプロイは GitHub 連携（`80mpm/chiban` の `main` へのマージ／push で両プロジェクトが本番デプロイ）**。
+各アプリの `vercel.json` の `ignoreCommand` で
+**プレビュー（main 以外のブランチ・PR）はビルドしない**（Preview 環境も本番と同じ DB を指すため、
+未マージのコードが本番 DB にスキーマ変更・データ削除を走らせないように）。片方のアプリだけが
+変わったときの不要ビルドは、Vercel のプロジェクト設定「Skip deployments when there are no changes
+to the root directory or its dependencies」（npm workspaces の `@chiban/shared` 依存を辿る。両プロジェクトで有効）で省く。
+`.vercelignore` が `.git` と `/tools` を除くため、Ignored Build Step で `git diff` やリポジトリ内の
+スクリプトは使えない点に注意。`regions: ["hnd1"]` も `vercel.json` で固定している。緊急時はローカル CLI（`vercel deploy --prod`）も
+引き続き使える（CLI デプロイには Ignored Build Step は効かない）
 
 **Vercel ダッシュボードで設定する環境変数**（両プロジェクト共通）:
 `DATABASE_URL` / `ZENRIN_USER_ID` / `ZENRIN_PASSWORD` / `ZENRIN_SERVICE_ID` /
@@ -369,9 +377,10 @@ apps/input/                   # 案件入力システム（事務用・port 3001
   `outputFileTracingIncludes`（`../../packages/shared/data/*`）で関数バンドルへ明示同梱する。
   パス解決は `lib/db/data-files.ts` の `seedDataPath()`（cwd からの上方探索）が担い、
   ローカル・Vercel（Root Directory 指定）どちらの cwd でも壊れない
-- `vercel deploy --prod`（CLI・ローカルから）でデプロイすると git 管理外の
-  `kouzu_parcels_seed.json.gz` も同梱され、全 51,114 筆が投入される。git 連携デプロイでは
-  gz が無いためフォールバック（595筆）になる点に注意（初回シード時のみ影響）
+- 筆マスタシード `kouzu_parcels_seed.json.gz` は **git 管理する**（2026-10 まで git 管理外で、
+  git 連携ビルドでは gz が無く 595 筆のフォールバック〔layout `kouzu-xml`〕になり、
+  `refreshParcelGeometryIfStale` が本番の筆配置を古い版へ戻しうる状態だった）。
+  念のため、フォールバック時は既存 DB の配置版を書き換えない（`seed-parcels.ts`）
 
 > 注意: Vercel のようなサーバーレス環境では関数インスタンスが複数並行起動しうるが、ZENRIN の
 > **同時ログイン数は 1**。このため ZENRIN セッションは PostgreSQL（`zenrin_session` テーブル）で

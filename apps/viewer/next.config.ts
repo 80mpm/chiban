@@ -12,8 +12,8 @@ const nextConfig: NextConfig = {
   // ensureDbReady() のシード投入が packages/shared/data/ のファイルを実行時に
   // fs.readFileSync で読むため、サーバーレス関数バンドルへ明示的に同梱する
   // （ファイルトレースの自動検出に任せると漏れて ENOENT になりうる）。
-  // kouzu_parcels_seed.json.gz は git 管理外だが、CLI（vercel deploy）デプロイでは
-  // アップロードされるため同梱対象に含める（git 連携デプロイ時は無視される）。
+  // kouzu_parcels_seed.json.gz も git 管理しているため、git 連携・CLI どちらの
+  // デプロイでも同梱される。
   outputFileTracingIncludes: {
     "/api/**": ["../../packages/shared/data/*"],
     "/": ["../../packages/shared/data/*"],

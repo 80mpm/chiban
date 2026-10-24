@@ -194,6 +194,15 @@ export async function refreshParcelGeometryIfStale(sql: Sql): Promise<boolean> {
     SELECT value FROM app_meta WHERE key = ${LAYOUT_META_KEY}
   `;
   if (current?.value === layout) return false;
+  // gz の無いビルド（フォールバックの 595 筆）で、全図面シードから入れた配置を
+  // 古い版へ戻さない。配置の更新は全図面シードを読めたときだけ行う。
+  if (source === KOUZU_JS_FILE && current) {
+    console.warn(
+      `筆ポリゴンの配置更新をスキップしました（${PARCEL_SEED_FILE} が無く、` +
+        `DB は ${current.value} のため ${layout} へは戻さない）`,
+    );
+    return false;
+  }
 
   const townRows = await sql<{ id: number; name: string }[]>`
     SELECT id, name FROM chibankuiki

@@ -312,7 +312,8 @@ def main():
         'parcels': all_parcels,
     }
     raw = json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-    with gzip.open(OUT, 'wb', compresslevel=9) as f:
+    # git 管理するため mtime を 0 に固定し、内容が同じなら同一バイト列になるようにする
+    with open(OUT, 'wb') as fo, gzip.GzipFile(fileobj=fo, mode='wb', compresslevel=9, mtime=0) as f:
         f.write(raw)
 
     n_public = sum(1 for p in all_parcels if not p['approx'])
