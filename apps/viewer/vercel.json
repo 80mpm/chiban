@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["hnd1"],
-  "ignoreCommand": "bash ../../tools/vercel-ignore-build.sh"
+  "ignoreCommand": "bash \"$(git rev-parse --show-toplevel)/tools/vercel-ignore-build.sh\" apps/viewer"
 }
