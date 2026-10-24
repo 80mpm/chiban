@@ -91,7 +91,6 @@ export function BuildingDetailView({
         landId={land.id}
         buildingId={building.id}
         documents={building.documents}
-        maxFiles={1}
       />
 
       <div className="flex justify-end">
