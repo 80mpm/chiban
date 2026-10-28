@@ -12,7 +12,7 @@ export type LandStatus = "target" | "acquired";
 /** 居住者と建物の所有者の一致（match=一致 / mismatch=不一致 / unknown=未確認）。 */
 export type ResidentOwnerMatch = "match" | "mismatch" | "unknown";
 
-/** 所有者。share は「分子/分母」文字列、持分なしは空文字。 */
+/** 所有者。share は「分子/分母」文字列（必須。単独所有は "1/1"）。必須化前の複数所有者のデータに限り空文字がありうる。 */
 export interface Owner {
   name: string;
   share: string;

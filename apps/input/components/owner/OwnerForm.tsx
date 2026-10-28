@@ -9,7 +9,7 @@ import { Input } from "@chiban/shared/components/ui/input";
 import { Textarea } from "@chiban/shared/components/ui/textarea";
 import { Label } from "@chiban/shared/components/ui/label";
 import { updateLand } from "@chiban/shared/lib/data-client";
-import { emptyOwner } from "@chiban/shared/lib/format";
+import { emptyOwner, isValidShare } from "@chiban/shared/lib/format";
 import type { Project, Land, Building, Owner } from "@chiban/shared/lib/types";
 
 const landTitle = (l: Land) => [l.aza, l.chiban].filter(Boolean).join(" ") || "—";
@@ -64,8 +64,12 @@ export function OwnerForm({
       return;
     }
     const share = values.share.trim().replace(/\s+/g, "");
-    if (share && !/^\d+\/[1-9]\d*$/.test(share)) {
-      setError("持分は「1/2」のような分数（分子/分母）で入力してください（単独所有は空欄）");
+    if (!share) {
+      setError("持分は必須です（単独所有は 1/1）");
+      return;
+    }
+    if (!isValidShare(share)) {
+      setError("持分は「1/2」のような分数（分子/分母）で入力してください（単独所有は 1/1）");
       return;
     }
     const cleaned: Owner = { ...values, name, share };
@@ -109,12 +113,14 @@ export function OwnerForm({
             />
           </div>
           <div className={fieldCls}>
-            <Label htmlFor="share" className="text-xs">持分</Label>
+            <Label htmlFor="share" className="text-xs">
+              持分 <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="share"
               value={values.share}
               onChange={(e) => set({ share: e.target.value })}
-              placeholder="例：1/2（単独所有は空欄）"
+              placeholder="例：1/2（単独所有は 1/1）"
               className="max-w-56"
             />
           </div>

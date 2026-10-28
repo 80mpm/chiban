@@ -42,9 +42,18 @@ export function formatOwners(owners: Owner[] | undefined | null): string {
     .join("・");
 }
 
-/** 空の所有者（行編集 UI の新規行テンプレート）。 */
+/**
+ * 持分の形式チェック（分子/分母の正の整数で、分子 ≤ 分母。例 '1/1'・'1520/6755'）。
+ * サーバ（queries/owners.ts）と同じ規則。
+ */
+export function isValidShare(share: string): boolean {
+  const m = /^([1-9]\d*)\/([1-9]\d*)$/.exec(share.trim());
+  return !!m && Number(m[1]) <= Number(m[2]);
+}
+
+/** 空の所有者（行編集 UI の新規行テンプレート）。持分は必須で、既定は単独所有の 1/1。 */
 export function emptyOwner(): Owner {
-  return { name: "", share: "", address: "", regDate: "", regCause: "", description: "" };
+  return { name: "", share: "1/1", address: "", regDate: "", regCause: "", description: "" };
 }
 
 /**

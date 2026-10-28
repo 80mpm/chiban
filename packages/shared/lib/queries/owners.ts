@@ -6,6 +6,8 @@
 
 import type { Sql, TransactionSql } from "postgres";
 import type { Owner } from "../types";
+import { ApiError } from "../api-error";
+import { isValidShare } from "../format";
 
 /** postgres.js の sql またはトランザクション sql のどちらでも受ける。 */
 type SqlLike = Sql | TransactionSql;
@@ -63,11 +65,22 @@ export async function replaceOwnersInto(
   ownerId: string,
   owners: Owner[] | undefined | null,
 ): Promise<void> {
+  // 持分は必須（単独所有は 1/1）。1 人でも欠けていれば何も書き換えずに 400 を返す
+  for (const o of owners ?? []) {
+    const name = (o?.name ?? "").trim();
+    if (!name) continue;
+    if (!isValidShare((o?.share ?? "").replace(/\s+/g, ""))) {
+      throw new ApiError(
+        400,
+        `所有者「${name}」の持分を「1/2」のような分数で入力してください（単独所有は 1/1）`,
+      );
+    }
+  }
   await sql`DELETE FROM ${sql(table)} WHERE ${sql(fkCol)} = ${ownerId}`;
   for (const o of owners ?? []) {
     const name = (o?.name ?? "").trim();
     if (!name) continue;
-    const [num, den] = parseShare(o?.share);
+    const [num, den] = parseShare((o?.share ?? "").replace(/\s+/g, ""));
     await sql`
       INSERT INTO ${sql(table)} (${sql(fkCol)}, name, share_num, share_den,
                                  address, reg_date, reg_cause, description)

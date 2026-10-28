@@ -519,7 +519,8 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 
 - `parcelId` が筆マスタ（parcels.id）への参照で、土地の所在の正本。`aza` / `chiban` / `polygon` は
   マスタからの導出値（API が読み出しのたびに parcels・chibankuiki から再導出。lands には保存しない）
-- `owners[{name, share}]` は `land_owners` テーブルに正規化（share は `'分子/分母'` 文字列、持分なしは `''`）。
+- `owners[{name, share}]` は `land_owners` テーブルに正規化（share は `'分子/分母'` 文字列で**必須**。単独所有は `'1/1'`で、入力フォームの既定値も `1/1`。
+  形式は分子・分母とも正の整数で分子 ≤ 分母〔`format.ts` の `isValidShare`〕。空・不正はフォームとサーバ〔`replaceOwnersInto`〕の両方で 400）。
   API は読み出し時に追加順で集約して返し、更新時は土地ごとに全置換する
 - `Building.residentOwnerMatch` は居住者と建物の所有者の一致を 3 値で持つ
   （`match`=一致 / `mismatch`=不一致 / `unknown`=未確認。既存・未送信は `unknown`）。表示ラベルと色は
@@ -540,7 +541,7 @@ Project { id, name, description, createdAt, updatedAt, polygon[[lat,lng]],
 | `parcels` | id (IDENTITY PK), chibankuiki_id (FK), chiban, geometry (jsonb), source ('master'/'manual') | 筆マスタ。`kouzu_parcels_seed.json.gz`（なければ `kouzu_xml_data.js`）から COPY で投入。`UNIQUE (chibankuiki_id, chiban)`。`source = 'manual'` は案件の公図から描いて手動登録した筆（2026-10 追加列・既定 `'master'`。Issue #44） |
 | `projects` | id (IDENTITY), name, description, polygon (jsonb), address, access, current_far, target_far, front_roads (jsonb), created_at, updated_at | 案件。API では id を文字列で返す |
 | `lands` | id (`id_xxxx`), project_id (FK), parcel_id (FK), description, area_m2, status, created_at, updated_at | `UNIQUE (project_id, parcel_id)`。所有者は `land_owners`、抵当権は `land_mortgages` に正規化 |
-| `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（持分なしは両方 NULL。`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。表示順は id（追加順） |
+| `land_owners` | id (IDENTITY PK), land_id (FK), name, share_num, share_den | 持分は分子・分母の整数2列（`CHECK` で同時 NULL/非 NULL と分母>0 を担保）。持分は必須だが、必須化（2026-10）前のデータのため NULL 自体は許す。所有者が 1 人だけで NULL のものはスキーマ初期化時に 1/1 へ補完する（冪等。旧フォームの「単独所有は空欄」と同義）。複数所有者で NULL のものは触らず、編集時に入力を求める表示順は id（追加順） |
 | `buildings` | id (`id_xxxx`), land_id (FK), location, kaoku_number, structure, usage, floor_area, built_date, description, resident_owner_match, created_at, updated_at | 建物（土地の子）。`resident_owner_match` は `CHECK` で `'match'/'mismatch'/'unknown'` に限定（既定 `'unknown'`。既存 DB には `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` で追随）。所有者は `building_owners`、抵当権は `building_mortgages` に正規化 |
 | `registry_documents` | id, land_id (FK・nullable), building_id (FK・nullable), project_id (FK・nullable), kind ('registry'/'kouzu'), overlay (jsonb), file_name, content_type, byte_size, data (bytea), uploaded_by, created_at, updated_at | 登記簿等の添付ファイル。`CHECK (num_nonnulls(land_id, building_id, project_id) = 1)` で土地・建物・案件のいずれか 1 つにだけ紐づくことを担保（2026-10 に旧制約 `registry_documents_owner_one` を `DO` ブロックで差し替え）。案件に紐づくのは筆を描く下地の公図（JPEG/PNG のみ）で、`overlay` に地図上の位置合わせ `{center, metersPerPixel, rotationDeg, opacity, imageWidth, imageHeight}` を持つ（画像の差し替えで NULL に戻る。Issue #44）。`kind` は種別（既定 `'registry'` = 登記簿・`'kouzu'` = 公図。2026-10 に `ADD COLUMN IF NOT EXISTS` で追加し既存行は登記簿扱い）。公図は土地・案件に添付でき、土地の読み出しは登記簿・公図の両方を返す（画面側で kind ごとにカードを分ける）。建物は登記簿のみ。**どの添付も紐づけ先ごと・種類ごとに 1 つまで**（案件の公図・土地の登記簿・土地の公図・建物の登記簿。`addDocument` が紐づけ先の行を `FOR UPDATE` でロックしてから数え、2 つ目は 409 で差し替えへ誘導）。かつて建物に添付できた公図（Issue #42）は廃止し、スキーマ初期化時に `DELETE` で消す（冪等）。上限導入前に複数付いていた添付は、スキーマ初期化時に紐づけ先・種類ごとに更新日時が最新の 1 つだけを残して `DELETE` する（冪等）。画面も添付を 1 ファイル分の枠（`AttachmentSlot`。未添付=点線の空き枠 + 添付ボタン／添付済み=ファイル 1 件 + 差し替え・削除）として見せ、件数表示や追加ボタンは持たない。ファイル本体を bytea に置くのはローカル・Vercel とも追加のストレージ契約なしで動かすため（将来 Vercel Blob へ移す場合は `data` を `blob_url` に替え `queries/documents.ts` だけを変更する） |
 | `visits` | id, land_id (FK), user_name, comment, date, direct_or_tel, meeting_type, next_date, progress, principal | 追加のみ。next_date は NULL ↔ API では `''` |
