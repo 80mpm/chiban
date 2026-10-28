@@ -138,6 +138,15 @@ CREATE TABLE IF NOT EXISTS building_owners (
     CHECK (share_den IS NULL OR share_den > 0)
 );
 CREATE INDEX IF NOT EXISTS idx_building_owners_building ON building_owners (building_id, id);
+-- 2026-10: 持分を必須化（単独所有は 1/1）。旧フォームは「単独所有は空欄」だったため、
+-- 所有者が 1 人だけの土地・建物で持分が空のものは 1/1 と同義として補完する（冪等）。
+-- 複数所有者で持分が空のものは意味を決められないので触らない（編集時に入力を求める）
+UPDATE land_owners o SET share_num = 1, share_den = 1
+ WHERE o.share_num IS NULL
+   AND (SELECT count(*) FROM land_owners x WHERE x.land_id = o.land_id) = 1;
+UPDATE building_owners o SET share_num = 1, share_den = 1
+ WHERE o.share_num IS NULL
+   AND (SELECT count(*) FROM building_owners x WHERE x.building_id = o.building_id) = 1;
 
 -- 抵当権（建物の子。land_mortgages と同型）
 CREATE TABLE IF NOT EXISTS building_mortgages (

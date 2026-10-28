@@ -84,10 +84,10 @@ function visit(
   return { user, comment, date, directOrTel, meetingType, nextDate, progress, principal };
 }
 
-/** 所有者（付帯情報は省略可。所有者名・住所・抵当権者はすべて架空）。 */
+/** 所有者（付帯情報は省略可。持分の既定は単独所有の 1/1。所有者名・住所・抵当権者はすべて架空）。 */
 function owner(
   name: string,
-  share = "",
+  share = "1/1",
   address = "",
   regDate = "",
   regCause = "",
@@ -243,7 +243,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
     await Promise.all([
       nishiAsakusaLand("24-3", {
         owners: [
-          owner("安野政子", "", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続"),
+          owner("安野政子", "1/1", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続"),
         ],
         description:
           "個人名義（安野氏）。世帯主と早期に条件合意し、所有権移転登記まで完了済み",
@@ -257,7 +257,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
             "木造瓦葺2階建",
             "居宅",
             96.52,
-            [owner("安野政子", "", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続")],
+            [owner("安野政子", "1/1", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続")],
             { builtDate: "1972-08-31", residentOwnerMatch: "match" },
           ),
         ],
@@ -283,7 +283,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
             "鉄骨造陸屋根3階建",
             "共同住宅",
             210.35,
-            [owner("中嶋直美", "", "東京都台東区西浅草二丁目23番1号", "2013-06-27", "売買")],
+            [owner("中嶋直美", "1/1", "東京都台東区西浅草二丁目23番1号", "2013-06-27", "売買")],
             {
               builtDate: "1969-08-05",
               residentOwnerMatch: "mismatch",
@@ -297,7 +297,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
       }),
       nishiAsakusaLand("24-6", {
         owners: [
-          owner("安野政子", "", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続"),
+          owner("安野政子", "1/1", "東京都台東区西浅草二丁目24番3号", "2002-10-14", "相続"),
         ],
         description:
           "個人名義（安野氏）の小規模筆。隣地 24-3 と一体活用を前提に交渉、スムーズに取得完了",
@@ -310,7 +310,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
       }),
       nishiAsakusaLand("24-5", {
         owners: [
-          owner("株式会社メイクス", "", "東京都中央区日本橋三丁目2番1号", "2018-03-19", "売買", "窓口は総務部（代表電話経由）"),
+          owner("株式会社メイクス", "1/1", "東京都中央区日本橋三丁目2番1号", "2018-03-19", "売買", "窓口は総務部（代表電話経由）"),
         ],
         description:
           "土地は法人（メイクス社）名義だが、地上の建物は個人（大森氏）名義の借地。土地・建物で権利者が異なり、双方との交渉が必要",
@@ -325,7 +325,7 @@ async function sampleProjects(db: SqlLike): Promise<SampleProject[]> {
             "木造亜鉛メッキ鋼板葺2階建",
             "居宅兼店舗",
             74.18,
-            [owner("大森健太郎", "", "東京都台東区西浅草二丁目24番5号", "1999-11-09", "所有権保存")],
+            [owner("大森健太郎", "1/1", "東京都台東区西浅草二丁目24番5号", "1999-11-09", "所有権保存")],
             {
               builtDate: "1999-11-09",
               description: "借地上建物（底地はメイクス社名義）",
